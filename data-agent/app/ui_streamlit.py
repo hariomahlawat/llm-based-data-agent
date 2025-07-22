@@ -17,7 +17,15 @@ from core.postprocess import extract_outputs, figure_to_png
 # ---------------------------------------------------------------------
 # Page setup
 # ---------------------------------------------------------------------
-st.set_page_config(page_title="Data Summarization & Charting Agent", layout="wide")
+# Hide Streamlit cloud links and deploy button
+st.set_page_config(
+    page_title="Data Summarization & Charting Agent",
+    layout="wide",
+    menu_items={"Get help": None, "Report a bug": None, "About": None},
+)
+# Remove toolbar items like "Deploy" and external help links
+st.set_option("client.toolbarMode", "minimal")
+st.set_option("client.showErrorDetails", False)
 st.title("📊 Data Summarization & Charting Agent")
 
 # Debug toggle
