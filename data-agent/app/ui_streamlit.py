@@ -26,8 +26,20 @@ st.set_page_config(
     menu_items={"Get help": None, "Report a bug": None, "About": None},
 )
 # Remove toolbar items like "Deploy" and external help links
-st.set_option("client.toolbarMode", "minimal")
+st.set_option("client.toolbarMode", "viewer")
 st.set_option("client.showErrorDetails", False)
+
+# Extra CSS to hide any remaining cloud or help links
+st.markdown(
+    """
+    <style>
+    [data-testid="stDeployButton"] {display: none !important;}
+    .stException a {display: none !important;}
+    .stError a {display: none !important;}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 st.title("📊 Data Summarization & Charting Agent")
 
 # Debug toggle
