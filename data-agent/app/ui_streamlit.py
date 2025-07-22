@@ -175,12 +175,14 @@ with st.expander("LLM → code → safe_exec"):
         if nl_q.strip():
             with st.spinner("Thinking..."):
                 try:
-                    code = ask_llm(nl_q, tuple(df.columns))
+                    intent, code = ask_llm(nl_q, df)
                 except Exception as e:
                     st.error("LLM call failed.")
                     if debug:
                         st.exception(e)
                 else:
+                    if intent:
+                        st.caption(intent)
                     st.code(code, language="python")
                     ok, result, tb = safe_ui(safe_run)(code, {"df": df, "pd": pd, "plt": plt})
                     if ok:

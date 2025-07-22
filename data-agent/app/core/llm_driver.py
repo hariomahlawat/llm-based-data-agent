@@ -1,10 +1,13 @@
 # app/core/llm_driver.py
 from __future__ import annotations
 
+import json
 import re
-import requests  # type: ignore
 from functools import lru_cache
 from typing import List, Tuple
+
+import pandas as pd
+import requests  # type: ignore
 
 # ---------------------------------------------------------------------
 # Config
@@ -21,14 +24,15 @@ PREFERRED_MODELS: List[str] = [
 ]
 
 SYSTEM_PROMPT = """You are a Python data analyst.
-Input: a question about a pandas DataFrame named df (with given columns).
-Output: ONLY Python code. No prose, no explanation.
+Input: a question about a pandas DataFrame named df (with given schema).
+Output: a JSON object with keys 'intent' and 'code'. No extra prose.
 Rules:
 - Use pandas as pd and matplotlib.pyplot as plt if plotting.
 - Store table outputs in variables like result_df/result_series.
 - If you create a plot, save it to a BytesIO variable named png.
 - Do not import anything or access disk/network.
 - Use only the provided column names.
+- Return valid JSON only, no code fences.
 """
 
 FEW_SHOTS: List[Tuple[str, str]] = [
@@ -45,28 +49,42 @@ FEW_SHOTS: List[Tuple[str, str]] = [
     ),
 ]
 
+
+def _schema_desc(df: pd.DataFrame) -> str:
+    lines: List[str] = []
+    for col in df.columns:
+        dtype = str(df[col].dtype)
+        series = df[col].dropna()
+        if series.empty:
+            sample = ""  # no values
+        elif pd.api.types.is_numeric_dtype(series):
+            sample_vals = series.unique()[:3]
+            sample = f"sample values: {', '.join(map(str, sample_vals))}"
+        else:
+            top = series.value_counts().index[:3].tolist()
+            sample = f"top categories: {', '.join(map(str, top))}"
+        lines.append(f"- {col} ({dtype}): {sample}")
+    return "\n".join(lines)
+
 # ---------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------
-def _extract_code(text: str) -> str:
-    m = re.search(r"```python(.*?)```", text, re.S | re.I)
-    if m:
-        return m.group(1).strip()
-    return text.strip()
+def _extract_json(text: str) -> tuple[str, str]:
+    try:
+        data = json.loads(text)
+        return data.get("intent", ""), data.get("code", "")
+    except Exception:
+        return "", text.strip()
 
 
-def _build_prompt(question: str, columns: list[str]) -> str:
+def _build_prompt(question: str, df: pd.DataFrame) -> str:
     shots = ""
     for q, code in FEW_SHOTS:
-        shots += f"Q: {q}\n```python\n{code}\n```\n\n"
-    cols = ", ".join(columns)
-    return f"""{SYSTEM_PROMPT}
-
-DataFrame columns: {cols}
-
-{shots}Q: {question}
-```python
-"""
+        shots += f"Q: {q}\n{{\"intent\": \"demo\", \"code\": \"{code}\"}}\n\n"
+    schema = _schema_desc(df)
+    return (
+        f"{SYSTEM_PROMPT}\n\nDataFrame schema:\n{schema}\n\n{shots}Q: {question}\n"
+    )
 
 
 def _post_ollama(path: str, payload: dict, timeout: int = 120) -> dict:
@@ -100,17 +118,35 @@ def check_model_ready() -> tuple[bool, str, str]:
 
 
 @lru_cache(maxsize=128)
-def ask_llm(question: str, columns: tuple[str, ...]) -> str:
+def ask_llm(question: str, df: pd.DataFrame, retries: int = 1) -> tuple[str, str]:
     ok, msg, model = check_model_ready()
     if not ok:
-        return f"# LLM unavailable: {msg}"
+        return "", f"# LLM unavailable: {msg}"
 
-    prompt = _build_prompt(question, list(columns))
-    resp = _post_ollama("/generate", {
-        "model": model,
-        "prompt": prompt,
-        "stream": False,
-        "options": {"temperature": 0.1}
-    })
-    raw = resp.get("response", "")
-    return _extract_code(raw)
+    error_msg = ""
+    intent = ""
+    code = ""
+    for _ in range(retries + 1):
+        q = question
+        if error_msg:
+            q += f"\nPrevious attempt failed with: {error_msg}\nReturn fixed JSON only."
+        prompt = _build_prompt(q, df)
+        resp = _post_ollama(
+            "/generate",
+            {
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0.1},
+            },
+        )
+        raw = resp.get("response", "")
+        intent, code = _extract_json(raw)
+        try:
+            from .safe_exec import _analyze  # type: ignore
+
+            _analyze(code)
+            break
+        except Exception as e:
+            error_msg = str(e)
+    return intent, code
