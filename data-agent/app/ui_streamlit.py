@@ -141,11 +141,21 @@ st.subheader("🤖 Ask in natural language")
 
 with st.expander("LLM → code → safe_exec"):
     nl_q = st.text_input("Question", placeholder="Show sales trend for last 3 months")
-    if st.button("Generate & run"):
+
+    # Quick model status
+    from core.llm_driver import check_model_ready
+    ok_model, msg = check_model_ready()
+    if not ok_model:
+        st.warning(f"LLM not available: {msg}")
+        st.caption("You can still use the sandbox below or manual charts.")
+    else:
+        st.success("LLM ready", icon="🟢")
+
+    if st.button("Generate & run", disabled=not ok_model):
         if nl_q.strip():
             with st.spinner("Thinking..."):
                 try:
-                    code = ask_llm(nl_q, list(df.columns))
+                    code = ask_llm(nl_q, tuple(df.columns))
                 except Exception as e:
                     st.error("LLM call failed.")
                     if debug:
@@ -161,7 +171,7 @@ with st.expander("LLM → code → safe_exec"):
                             if isinstance(val, pd.DataFrame):
                                 st.write(f"**DataFrame: `{key}`**")
                                 st.dataframe(val)
-                        # Try to display any BytesIO named png
+                        # bytes images
                         try:
                             from io import BytesIO
                             for val in locals_out.values():
@@ -174,6 +184,7 @@ with st.expander("LLM → code → safe_exec"):
                         st.error("Generated code failed or was blocked.")
                         if debug:
                             st.exception(tb)
+
 
 # ---------------------------------------------------------------------
 # Safe code sandbox

@@ -12,12 +12,10 @@ def get_logger(name: str = "data_agent"):
     if _logger is None:
         _logger = logging.getLogger(name)
         _logger.setLevel(logging.INFO)
-
         handler = RotatingFileHandler(LOG_FILE, maxBytes=1_000_000, backupCount=3)
-        fmt = logging.Formatter(
-            "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
-        )
+        fmt = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
         handler.setFormatter(fmt)
         _logger.addHandler(handler)
     return _logger
+
 

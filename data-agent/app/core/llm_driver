@@ -1,34 +1,42 @@
 import requests
 import re
-from typing import Tuple, Optional, List
+from functools import lru_cache
+from typing import List
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL_NAME = "mistral:7b-instruct"   # change if needed
+OLLAMA_URL = "http://localhost:11434/api"
+MODEL_NAME = "mistral:7b-instruct"  # change to what you actually pulled
 
 SYSTEM_PROMPT = """You are a Python data analyst.
 Input: a question about a pandas DataFrame named df (with given columns).
 Output: ONLY Python code. No prose, no explanation.
 Rules:
-- Use pandas (pd), matplotlib.pyplot as plt.
-- Store table outputs in variables named result_df, result_series, etc.
-- For figures, use matplotlib and save to a BytesIO 'png' variable (if you create a plot).
-- Do not import anything.
-- Do not read or write files.
+- Use pandas as pd and matplotlib.pyplot as plt if plotting.
+- Store table outputs in variables like result_df/result_series.
+- If you create a plot, save it to a BytesIO variable named png.
+- Do not import anything or access disk/network.
 - Use only the provided column names.
 """
 
-FEW_SHOTS: List[Tuple[str, str]] = [
+FEW_SHOTS: List[tuple[str, str]] = [
     (
         "Show total sales by region",
         "result_df = df.groupby('region')['sales'].sum().reset_index()\nprint(result_df.head())"
     ),
     (
         "Histogram of unit_price",
-        "import matplotlib.pyplot as plt\nfrom io import BytesIO\nfig, ax = plt.subplots()\ndf['unit_price'].hist(bins=30, ax=ax)\nax.set_title('unit_price histogram')\npng = BytesIO()\nfig.savefig(png, format='png', bbox_inches='tight')\npng.seek(0)\nplt.close(fig)"
+        "from io import BytesIO\nfig, ax = plt.subplots()\ndf['unit_price'].hist(bins=30, ax=ax)\nax.set_title('unit_price histogram')\npng = BytesIO()\nfig.savefig(png, format='png', bbox_inches='tight')\npng.seek(0)\nplt.close(fig)"
     ),
 ]
 
-def build_prompt(question: str, columns: list[str]) -> str:
+
+def _extract_code(text: str) -> str:
+    m = re.search(r"```python(.*?)```", text, re.S | re.I)
+    if m:
+        return m.group(1).strip()
+    return text.strip()
+
+
+def _build_prompt(question: str, columns: list[str]) -> str:
     shots = ""
     for q, code in FEW_SHOTS:
         shots += f"Q: {q}\n```python\n{code}\n```\n\n"
@@ -37,28 +45,48 @@ def build_prompt(question: str, columns: list[str]) -> str:
 
 DataFrame columns: {cols}
 
-{shots}
-Q: {question}
+{shots}Q: {question}
 ```python
 """
 
-def extract_code(text: str) -> str:
-    # Try fenced block first
-    m = re.search(r"```python(.*?)```", text, re.S)
-    if m:
-        return m.group(1).strip()
-    # else return whole text
-    return text.strip()
 
-def ask_llm(question: str, columns: list[str]) -> str:
-    prompt = build_prompt(question, columns)
-    resp = requests.post(OLLAMA_URL, json={
+def _post_ollama(path: str, payload: dict, timeout: int = 120) -> dict:
+    r = requests.post(f"{OLLAMA_URL}{path}", json=payload, timeout=timeout)
+    r.raise_for_status()
+    return r.json()
+
+
+def check_model_ready(model: str = MODEL_NAME) -> tuple[bool, str]:
+    """
+    Returns (ok, message). ok=False if model not found or server down.
+    """
+    try:
+        models = _post_ollama("/tags", {})  # list models
+    except Exception as e:
+        return False, f"Ollama unreachable: {e}"
+
+    names = [m.get("name") for m in models.get("models", [])]
+    if model not in names:
+        return False, f"Model '{model}' not found. Pull with: ollama pull {model}"
+    return True, "OK"
+
+
+@lru_cache(maxsize=128)
+def ask_llm(question: str, columns: tuple[str, ...]) -> str:
+    """
+    Cached NL->code generator. Columns must be hashable (tuple).
+    """
+    ok, msg = check_model_ready()
+    if not ok:
+        # return a trivial fallback (user can still paste code manually)
+        return "# LLM unavailable: " + msg
+
+    prompt = _build_prompt(question, list(columns))
+    resp = _post_ollama("/generate", {
         "model": MODEL_NAME,
         "prompt": prompt,
         "stream": False,
         "options": {"temperature": 0.1}
-    }, timeout=120)
-    resp.raise_for_status()
-    raw = resp.json().get("response", "")
-    return extract_code(raw)
-
+    })
+    raw = resp.get("response", "")
+    return _extract_code(raw)
