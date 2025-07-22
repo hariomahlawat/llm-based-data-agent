@@ -111,6 +111,20 @@ pip install -r requirements.txt
 streamlit run app/ui_streamlit.py
 ```
 
+### 6.4 Makefile Shortcuts
+
+```bash
+# run local app with venv
+make dev
+
+# format and lint
+make fmt
+make lint
+
+# run docker compose
+make docker
+```
+
 ---
 
 ## 7. Repository Layout
