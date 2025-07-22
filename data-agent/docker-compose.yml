@@ -8,6 +8,7 @@ services:
     volumes:
       - ./app:/app/app:rw   # hot-reload code
       - ./data:/app/data:rw # optional upload folder
+      - ~/.ollama:/root/.ollama # persist models
     environment:
       - PYTHONUNBUFFERED=1
 

@@ -1,0 +1,10 @@
+{
+    "name": "data-agent",
+    "image": "mcr.microsoft.com/devcontainers/python:3.11",
+    "postCreateCommand": "curl -fsSL https://ollama.ai/install.sh | sh && pip install -r data-agent/requirements.txt -r requirements-dev.txt",
+    "runArgs": ["--volume", "${localEnv:HOME}/.ollama:/root/.ollama"],
+    "containerEnv": {
+        "OLLAMA_URL": "${localEnv:OLLAMA_URL}"
+    },
+    "forwardPorts": [8501]
+}

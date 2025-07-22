@@ -1,0 +1,6 @@
+pre-commit
+ruff
+isort
+mypy
+pyproject-fmt
+pytest
