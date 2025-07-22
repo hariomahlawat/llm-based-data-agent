@@ -149,7 +149,14 @@ root/
 
 ## 8. Roadmap Checklist
 
--
+- **Data Prep Wizards**
+  - Column type fixer (int/float/date)
+  - Missing value heatmap
+  - Quick outlier detection (IQR / z-score)
+- **Chart UX**
+  - Themes (dark/light)
+  - Save chart presets
+  - Facet grids for bar/hist in addition to line
 
 ---
 

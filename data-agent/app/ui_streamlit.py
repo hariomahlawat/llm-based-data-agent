@@ -1,20 +1,19 @@
 # app/ui_streamlit.py
-import streamlit as st
-import pandas as pd
 import matplotlib.pyplot as plt
-
-from core.file_loader import load_any
-from core.analysis import basic_summary, coerce_datetime
-from core.charts import (
-    line_plot, bar_plot, hist_plot, box_plot, scatter_plot, facet_line
-)
-from core.safe_exec import run as safe_run
+import pandas as pd
+import streamlit as st
+from core.analysis import (basic_summary, coerce_column, coerce_datetime,
+                           detect_outliers, missing_heatmap)
+from core.charts import (bar_plot, box_plot, facet_bar, facet_hist, facet_line,
+                         hist_plot, line_plot, scatter_plot)
 from core.error_utils import safe_ui
-from core.logger import get_logger
+from core.file_loader import load_any
+from core.history import add_record, get_history
 from core.llm_driver import ask_llm, check_model_ready
+from core.logger import get_logger
 from core.postprocess import extract_outputs, figure_to_png
-from core.history import get_history, add_record
 from core.reporting import history_to_pdf, history_to_pptx, zip_outputs
+from core.safe_exec import run as safe_run
 
 # ---------------------------------------------------------------------
 # Page setup
@@ -44,6 +43,8 @@ st.title("📊 Data Summarization & Charting Agent")
 
 # Debug toggle
 debug = st.sidebar.checkbox("Show debug tracebacks", value=False)
+theme = st.sidebar.selectbox("Theme", ["light", "dark"], index=0)
+plt.style.use("dark_background" if theme == "dark" else "default")
 logger = get_logger()
 
 # ---------------------------------------------------------------------
@@ -126,9 +127,31 @@ with st.sidebar.expander("Export", expanded=False):
 # Optional: date parsing
 # ---------------------------------------------------------------------
 with st.expander("🗓️ Date parsing"):
-    date_col = st.selectbox("Column to parse as datetime (optional)", ["<none>"] + list(df.columns))
+    date_col = st.selectbox(
+        "Column to parse as datetime (optional)", ["<none>"] + list(df.columns)
+    )
     if date_col != "<none>":
         df = coerce_datetime(df, date_col)
+
+with st.expander("🧹 Data prep wizards"):
+    col = st.selectbox("Column", ["<none>"] + list(df.columns))
+    dtype = st.selectbox("Convert to", ["int", "float", "datetime"])
+    if st.button("Fix column type") and col != "<none>":
+        df = coerce_column(df, col, dtype)
+        st.experimental_rerun()
+
+    miss_btn = st.button("Show missing value heatmap")
+    if miss_btn:
+        png = missing_heatmap(df)
+        st.image(png)
+
+    out_col = st.selectbox(
+        "Outlier column", ["<none>"] + df.select_dtypes("number").columns.tolist()
+    )
+    method = st.selectbox("Method", ["iqr", "zscore"])
+    if st.button("Detect outliers") and out_col != "<none>":
+        mask = detect_outliers(df[out_col], method=method)
+        st.write(mask.value_counts().to_dict())
 
 # ---------------------------------------------------------------------
 # Preview & Summary
@@ -139,19 +162,24 @@ st.dataframe(df.head())
 st.subheader("Basic Summary")
 st.json(basic_summary(df))
 
+
 # ---------------------------------------------------------------------
 # Helper for rendering charts with error handling
 # ---------------------------------------------------------------------
-def render_chart(fn, *args, **kwargs):
-    ok, png, tb = safe_ui(fn)(*args, **kwargs)
+def render_chart(fn, params: dict):
+    ok, png, tb = safe_ui(fn)(df, **params)
     if ok:
         st.image(png)
-        st.download_button("Download PNG", data=png, file_name="chart.png", mime="image/png")
+        st.download_button(
+            "Download PNG", data=png, file_name="chart.png", mime="image/png"
+        )
         st.toast("Chart created!", icon="✅")
+        st.session_state["last_chart"] = {"type": fn.__name__, "params": params}
     else:
         st.error("Chart failed. Please adjust inputs.")
         if debug:
             st.exception(tb)
+
 
 # ---------------------------------------------------------------------
 # Charts UI
@@ -159,9 +187,36 @@ def render_chart(fn, *args, **kwargs):
 st.divider()
 st.subheader("Charts")
 
+st.session_state.setdefault("chart_presets", [])
+with st.sidebar.expander("Chart presets", expanded=False):
+    if st.session_state["chart_presets"]:
+        for item in st.session_state["chart_presets"]:
+            st.markdown(f"**{item['name']}** - {item['type']}")
+            st.json(item["params"])
+    if "last_chart" in st.session_state:
+        name = st.text_input("Preset name", key="preset_name")
+        if st.button("Save preset"):
+            st.session_state["chart_presets"].append(
+                {
+                    "name": name
+                    or f"Preset {len(st.session_state['chart_presets']) + 1}",
+                    **st.session_state.pop("last_chart"),
+                }
+            )
+            st.success("Preset saved")
+
 chart_type = st.selectbox(
     "Chart type",
-    ["line", "bar", "histogram", "box", "scatter", "facet line"]
+    [
+        "line",
+        "bar",
+        "histogram",
+        "box",
+        "scatter",
+        "facet line",
+        "facet bar",
+        "facet hist",
+    ],
 )
 
 num_cols = df.select_dtypes("number").columns.tolist()
@@ -173,7 +228,8 @@ if chart_type == "line":
     y = st.selectbox("Y axis (numeric)", num_cols)
     log_y = st.checkbox("Log scale Y")
     if st.button("Plot line"):
-        render_chart(line_plot, df, x, y, log_y=log_y)
+        params = {"x": x, "y": y, "log_y": log_y}
+        render_chart(line_plot, params)
 
 elif chart_type == "bar":
     x = st.selectbox("Category (x)", all_cols)
@@ -183,24 +239,29 @@ elif chart_type == "bar":
     stacked = st.checkbox("Stacked", value=True)
     if st.button("Plot bar"):
         y_val = None if y_opt == "<count>" else y_opt
-        render_chart(
-            bar_plot, df, x, y_val,
-            agg=agg, stacked=stacked,
-            hue=None if hue == "<none>" else hue
-        )
+        params = {
+            "x": x,
+            "y": y_val,
+            "agg": agg,
+            "stacked": stacked,
+            "hue": None if hue == "<none>" else hue,
+        }
+        render_chart(bar_plot, params)
 
 elif chart_type == "histogram":
     cols = st.multiselect("Numeric columns", num_cols, default=num_cols[:1])
     bins = st.slider("Bins", 5, 100, 30)
     log_y = st.checkbox("Log scale Y")
     if st.button("Plot histogram"):
-        render_chart(hist_plot, df, cols, bins=bins, log_y=log_y)
+        params = {"cols": cols, "bins": bins, "log_y": log_y}
+        render_chart(hist_plot, params)
 
 elif chart_type == "box":
     cols = st.multiselect("Numeric columns", num_cols, default=num_cols[:1])
     by = st.selectbox("Group by (optional category)", ["<none>"] + cat_cols)
     if st.button("Plot box"):
-        render_chart(box_plot, df, cols, by=None if by == "<none>" else by)
+        params = {"cols": cols, "by": None if by == "<none>" else by}
+        render_chart(box_plot, params)
 
 elif chart_type == "scatter":
     x = st.selectbox("X axis (numeric)", num_cols)
@@ -209,18 +270,47 @@ elif chart_type == "scatter":
     log_x = st.checkbox("Log X")
     log_y = st.checkbox("Log Y")
     if st.button("Plot scatter"):
-        render_chart(
-            scatter_plot, df, x, y,
-            hue=None if hue == "<none>" else hue,
-            log_x=log_x, log_y=log_y
-        )
+        params = {
+            "x": x,
+            "y": y,
+            "hue": None if hue == "<none>" else hue,
+            "log_x": log_x,
+            "log_y": log_y,
+        }
+        render_chart(scatter_plot, params)
 
 elif chart_type == "facet line":
     x = st.selectbox("X axis", all_cols)
     y = st.selectbox("Y axis (numeric)", num_cols)
     facet_by = st.selectbox("Facet by (category)", cat_cols)
     if st.button("Plot facets"):
-        render_chart(facet_line, df, x, y, facet_by)
+        params = {"x": x, "y": y, "facet_by": facet_by}
+        render_chart(facet_line, params)
+
+elif chart_type == "facet bar":
+    x = st.selectbox("Category (x)", all_cols)
+    y_opt = st.selectbox("Value (y) [optional]", ["<count>"] + num_cols)
+    facet_by = st.selectbox("Facet by (category)", cat_cols)
+    agg = st.selectbox("Aggregation", ["sum", "mean", "count", "min", "max"])
+    stacked = st.checkbox("Stacked", value=True)
+    if st.button("Plot facets"):
+        y_val = None if y_opt == "<count>" else y_opt
+        params = {
+            "x": x,
+            "y": y_val,
+            "facet_by": facet_by,
+            "agg": agg,
+            "stacked": stacked,
+        }
+        render_chart(facet_bar, params)
+
+elif chart_type == "facet hist":
+    col = st.selectbox("Numeric column", num_cols)
+    facet_by = st.selectbox("Facet by (category)", cat_cols)
+    bins = st.slider("Bins", 5, 100, 30)
+    if st.button("Plot facets"):
+        params = {"col": col, "facet_by": facet_by, "bins": bins}
+        render_chart(facet_hist, params)
 
 # ---------------------------------------------------------------------
 # Natural language panel
@@ -238,7 +328,6 @@ with st.expander("LLM → code → safe_exec"):
     else:
         st.success(f"LLM ready ({chosen_model})", icon="🟢")
 
-
     if st.button("Generate & run", disabled=not ok_model):
         if nl_q.strip():
             with st.spinner("Thinking..."):
@@ -252,7 +341,9 @@ with st.expander("LLM → code → safe_exec"):
                     if intent:
                         st.caption(intent)
                     st.code(code, language="python")
-                    ok, result, tb = safe_ui(safe_run)(code, {"df": df, "pd": pd, "plt": plt})
+                    ok, result, tb = safe_ui(safe_run)(
+                        code, {"df": df, "pd": pd, "plt": plt}
+                    )
                     if ok:
                         locals_out, stdout_txt = result
                         if stdout_txt.strip():
@@ -297,7 +388,7 @@ with st.expander("Paste Python code that uses df / pandas / matplotlib"):
         "Code",
         height=200,
         value=st.session_state.pop("code_edit", ""),
-        placeholder="e.g.\nresult = df.groupby('region')['sales'].sum().reset_index()\nprint(result.head())"
+        placeholder="e.g.\nresult = df.groupby('region')['sales'].sum().reset_index()\nprint(result.head())",
     )
     if st.button("Run code safely"):
         if code.strip():
