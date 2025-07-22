@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from functools import lru_cache
 from typing import List, Tuple
@@ -50,19 +51,23 @@ FEW_SHOTS: List[Tuple[str, str]] = [
 ]
 
 
-def _schema_desc(df: pd.DataFrame) -> str:
+def _schema_desc(df: pd.DataFrame, redact_cols: List[str] | None = None) -> str:
     lines: List[str] = []
+    redact_set = set(redact_cols or [])
     for col in df.columns:
         dtype = str(df[col].dtype)
-        series = df[col].dropna()
-        if series.empty:
-            sample = ""  # no values
-        elif pd.api.types.is_numeric_dtype(series):
-            sample_vals = series.unique()[:3]
-            sample = f"sample values: {', '.join(map(str, sample_vals))}"
+        if col in redact_set:
+            sample = "<redacted>"
         else:
-            top = series.value_counts().index[:3].tolist()
-            sample = f"top categories: {', '.join(map(str, top))}"
+            series = df[col].dropna()
+            if series.empty:
+                sample = ""  # no values
+            elif pd.api.types.is_numeric_dtype(series):
+                sample_vals = series.unique()[:3]
+                sample = f"sample values: {', '.join(map(str, sample_vals))}"
+            else:
+                top = series.value_counts().index[:3].tolist()
+                sample = f"top categories: {', '.join(map(str, top))}"
         lines.append(f"- {col} ({dtype}): {sample}")
     return "\n".join(lines)
 
@@ -77,11 +82,11 @@ def _extract_json(text: str) -> tuple[str, str]:
         return "", text.strip()
 
 
-def _build_prompt(question: str, df: pd.DataFrame) -> str:
+def _build_prompt(question: str, df: pd.DataFrame, redact_cols: List[str] | None = None) -> str:
     shots = ""
     for q, code in FEW_SHOTS:
         shots += f"Q: {q}\n{{\"intent\": \"demo\", \"code\": \"{code}\"}}\n\n"
-    schema = _schema_desc(df)
+    schema = _schema_desc(df, redact_cols=redact_cols)
     return (
         f"{SYSTEM_PROMPT}\n\nDataFrame schema:\n{schema}\n\n{shots}Q: {question}\n"
     )
@@ -130,7 +135,9 @@ def ask_llm(question: str, df: pd.DataFrame, retries: int = 1) -> tuple[str, str
         q = question
         if error_msg:
             q += f"\nPrevious attempt failed with: {error_msg}\nReturn fixed JSON only."
-        prompt = _build_prompt(q, df)
+        pii_env = os.environ.get("PII_COLUMNS", "")
+        redact_cols = [c.strip() for c in pii_env.split(",") if c.strip()]
+        prompt = _build_prompt(q, df, redact_cols=redact_cols)
         resp = _post_ollama(
             "/generate",
             {
