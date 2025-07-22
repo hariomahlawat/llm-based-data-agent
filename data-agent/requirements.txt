@@ -3,3 +3,5 @@ pandas>=2.2
 matplotlib>=3.9
 numpy>=1.26
 openpyxl>=3.1     # lets pandas read .xlsx
+reportlab>=4.0
+python-pptx>=0.6
