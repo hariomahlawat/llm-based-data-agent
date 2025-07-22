@@ -1,0 +1,13 @@
+version: "3.9"
+services:
+  data_agent:
+    build: .
+    container_name: data-agent
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./app:/app/app:rw   # hot-reload code
+      - ./data:/app/data:rw # optional upload folder
+    environment:
+      - PYTHONUNBUFFERED=1
+
