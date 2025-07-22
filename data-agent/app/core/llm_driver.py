@@ -1,31 +1,24 @@
-"""Lightweight wrapper for calling a local LLM via Ollama.
-
-This module exposes two helper functions used by the Streamlit UI:
-
-``ask_llm``
-    Convert a natural language question about ``df`` into executable Python code.
-
-``check_model_ready``
-    Verify that the configured model is available from the Ollama server.
-
-The original implementation lived in a file named ``llm_driver`` (without the
-``.py`` extension).  When Python imports ``core.llm_driver`` it only considers
-``llm_driver.py``, therefore the UI could not find ``ask_llm`` which resulted in
-``ImportError``.  The logic from that file is consolidated here so that the
-module behaves as expected.
-"""
-
+# app/core/llm_driver.py
 from __future__ import annotations
 
 import re
-from functools import lru_cache
-from typing import List
-
 import requests
+from functools import lru_cache
+from typing import List, Tuple
 
-
+# ---------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------
+# If your Streamlit app runs inside Docker and Ollama runs on host:
+# OLLAMA_URL = "http://host.docker.internal:11434/api"
 OLLAMA_URL = "http://localhost:11434/api"
-MODEL_NAME = "mistral:7b-instruct"  # change to what you actually pulled
+
+PREFERRED_MODELS: List[str] = [
+    "mistral:7b-instruct",
+    "llama3:8b-instruct",
+    "llama3:8b-instruct-q3_K_L",
+    "phi3:3.8b-mini-instruct"
+]
 
 SYSTEM_PROMPT = """You are a Python data analyst.
 Input: a question about a pandas DataFrame named df (with given columns).
@@ -38,18 +31,23 @@ Rules:
 - Use only the provided column names.
 """
 
-FEW_SHOTS: List[tuple[str, str]] = [
+FEW_SHOTS: List[Tuple[str, str]] = [
     (
         "Show total sales by region",
-        "result_df = df.groupby('region')['sales'].sum().reset_index()\nprint(result_df.head())",
+        "result_df = df.groupby('region')['sales'].sum().reset_index()\nprint(result_df.head())"
     ),
     (
         "Histogram of unit_price",
-        "from io import BytesIO\nfig, ax = plt.subplots()\ndf['unit_price'].hist(bins=30, ax=ax)\nax.set_title('unit_price histogram')\npng = BytesIO()\nfig.savefig(png, format='png', bbox_inches='tight')\npng.seek(0)\nplt.close(fig)",
+        "from io import BytesIO\nfig, ax = plt.subplots()\n"
+        "df['unit_price'].hist(bins=30, ax=ax)\nax.set_title('unit_price histogram')\n"
+        "png = BytesIO()\nfig.savefig(png, format='png', bbox_inches='tight')\n"
+        "png.seek(0)\nplt.close(fig)"
     ),
 ]
 
-
+# ---------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------
 def _extract_code(text: str) -> str:
     m = re.search(r"```python(.*?)```", text, re.S | re.I)
     if m:
@@ -76,40 +74,43 @@ def _post_ollama(path: str, payload: dict, timeout: int = 120) -> dict:
     r.raise_for_status()
     return r.json()
 
-
-def check_model_ready(model: str = MODEL_NAME) -> tuple[bool, str]:
-    """Check that ``model`` exists on the local Ollama server."""
-
+# ---------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------
+def check_model_ready() -> tuple[bool, str, str]:
+    """
+    Returns (ok, message, chosen_model).
+    ok=False if Ollama not reachable or no model fits.
+    """
     try:
-        models = _post_ollama("/tags", {})  # list models
-    except Exception as e:  # pragma: no cover - network failure
-        return False, f"Ollama unreachable: {e}"
+        models = _post_ollama("/tags", {})
+    except Exception as e:
+        return False, f"Ollama unreachable: {e}", ""
 
     names = [m.get("name") for m in models.get("models", [])]
-    if model not in names:
-        return False, f"Model '{model}' not found. Pull with: ollama pull {model}"
-    return True, "OK"
+
+    for pref in PREFERRED_MODELS:
+        if pref in names:
+            return True, "OK", pref
+
+    if names:
+        return True, f"Using first available model: {names[0]}", names[0]
+
+    return False, "No models installed. Try: ollama pull mistral:7b-instruct", ""
 
 
 @lru_cache(maxsize=128)
 def ask_llm(question: str, columns: tuple[str, ...]) -> str:
-    """Return Python code answering ``question`` about ``df`` with ``columns``."""
-
-    ok, msg = check_model_ready()
+    ok, msg, model = check_model_ready()
     if not ok:
-        # return a trivial fallback (user can still paste code manually)
-        return "# LLM unavailable: " + msg
+        return f"# LLM unavailable: {msg}"
 
     prompt = _build_prompt(question, list(columns))
-    resp = _post_ollama(
-        "/generate",
-        {
-            "model": MODEL_NAME,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"temperature": 0.1},
-        },
-    )
+    resp = _post_ollama("/generate", {
+        "model": model,
+        "prompt": prompt,
+        "stream": False,
+        "options": {"temperature": 0.1}
+    })
     raw = resp.get("response", "")
     return _extract_code(raw)
-
