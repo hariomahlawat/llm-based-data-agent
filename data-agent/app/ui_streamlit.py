@@ -13,8 +13,6 @@ from core.error_utils import safe_ui
 from core.logger import get_logger
 from core.llm_driver import ask_llm, check_model_ready
 from core.postprocess import extract_outputs, figure_to_png
-from core.llm_driver import ask_llm, check_model_ready
-
 
 # ---------------------------------------------------------------------
 # Page setup
