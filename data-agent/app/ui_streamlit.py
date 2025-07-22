@@ -13,6 +13,8 @@ from core.error_utils import safe_ui
 from core.logger import get_logger
 from core.llm_driver import ask_llm, check_model_ready
 from core.postprocess import extract_outputs, figure_to_png
+from core.llm_driver import ask_llm, check_model_ready
+
 
 # ---------------------------------------------------------------------
 # Page setup
@@ -151,12 +153,13 @@ st.subheader("🤖 Ask in natural language")
 with st.expander("LLM → code → safe_exec"):
     nl_q = st.text_input("Question", placeholder="Show sales trend for last 3 months")
 
-    ok_model, msg = check_model_ready()
+    ok_model, msg, chosen_model = check_model_ready()
     if not ok_model:
         st.warning(f"LLM not available: {msg}")
         st.caption("You can still use the sandbox below or manual charts.")
     else:
-        st.success("LLM ready", icon="🟢")
+        st.success(f"LLM ready ({chosen_model})", icon="🟢")
+
 
     if st.button("Generate & run", disabled=not ok_model):
         if nl_q.strip():
