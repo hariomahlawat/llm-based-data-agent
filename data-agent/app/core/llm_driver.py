@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-import requests
+import requests  # type: ignore
 from functools import lru_cache
 from typing import List, Tuple
 
