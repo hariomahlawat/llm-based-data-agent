@@ -1,7 +1,8 @@
-import matplotlib.pyplot as plt
-import pandas as pd
 from io import BytesIO
 from typing import Optional, Sequence
+
+import matplotlib.pyplot as plt
+import pandas as pd
 
 
 def _fig_to_png(fig) -> BytesIO:
@@ -21,13 +22,20 @@ def line_plot(df: pd.DataFrame, x: str, y: str, log_y: bool = False):
     return _fig_to_png(fig)
 
 
-def bar_plot(df: pd.DataFrame, x: str, y: Optional[str], agg: str = "sum",
-             stacked: bool = False, hue: Optional[str] = None):
+def bar_plot(
+    df: pd.DataFrame,
+    x: str,
+    y: Optional[str],
+    agg: str = "sum",
+    stacked: bool = False,
+    hue: Optional[str] = None,
+):
     fig, ax = plt.subplots()
 
     if hue:
-        pivot = df.pivot_table(index=x, columns=hue, values=y or x,
-                               aggfunc=("count" if y is None else agg))
+        pivot = df.pivot_table(
+            index=x, columns=hue, values=y or x, aggfunc=("count" if y is None else agg)
+        )
         pivot.plot(kind="bar", stacked=stacked, ax=ax)
         ax.set_ylabel(("count" if y is None else f"{agg}({y})"))
     else:
@@ -44,8 +52,9 @@ def bar_plot(df: pd.DataFrame, x: str, y: Optional[str], agg: str = "sum",
     return _fig_to_png(fig)
 
 
-def hist_plot(df: pd.DataFrame, cols: Sequence[str], bins: int = 30,
-              log_y: bool = False):
+def hist_plot(
+    df: pd.DataFrame, cols: Sequence[str], bins: int = 30, log_y: bool = False
+):
     fig, ax = plt.subplots()
     df[list(cols)].plot(kind="hist", bins=bins, alpha=0.6, ax=ax)
     ax.set_title(f"Histogram ({', '.join(cols)})")
@@ -69,8 +78,14 @@ def box_plot(df: pd.DataFrame, cols: Sequence[str], by: Optional[str] = None):
     return _fig_to_png(fig)
 
 
-def scatter_plot(df: pd.DataFrame, x: str, y: str, hue: Optional[str] = None,
-                 log_x: bool = False, log_y: bool = False):
+def scatter_plot(
+    df: pd.DataFrame,
+    x: str,
+    y: str,
+    hue: Optional[str] = None,
+    log_x: bool = False,
+    log_y: bool = False,
+):
     fig, ax = plt.subplots()
     if hue and hue in df.columns:
         for val, chunk in df.groupby(hue):
@@ -103,3 +118,49 @@ def facet_line(df: pd.DataFrame, x: str, y: str, facet_by: str):
     fig.tight_layout()
     return _fig_to_png(fig)
 
+
+def facet_bar(
+    df: pd.DataFrame,
+    x: str,
+    y: Optional[str],
+    facet_by: str,
+    agg: str = "sum",
+    stacked: bool = False,
+) -> BytesIO:
+    levels = df[facet_by].dropna().unique()[:8]
+    n = len(levels)
+    cols = 2
+    rows = (n + 1) // cols
+    fig, axes = plt.subplots(rows, cols, figsize=(10, 4 * rows), squeeze=False)
+    for ax, lvl in zip(axes.ravel(), levels):
+        sub = df[df[facet_by] == lvl]
+        if y:
+            grp = getattr(sub.groupby(x)[y], agg)()
+            grp.plot(kind="bar", stacked=stacked, ax=ax)
+            ax.set_ylabel(f"{agg}({y})")
+        else:
+            sub[x].value_counts().plot(kind="bar", ax=ax)
+            ax.set_ylabel("count")
+        ax.set_title(str(lvl))
+    for ax in axes.ravel()[n:]:
+        ax.axis("off")
+    fig.suptitle(f"Facet bar by {facet_by}")
+    fig.tight_layout()
+    return _fig_to_png(fig)
+
+
+def facet_hist(df: pd.DataFrame, col: str, facet_by: str, bins: int = 30) -> BytesIO:
+    levels = df[facet_by].dropna().unique()[:8]
+    n = len(levels)
+    cols = 2
+    rows = (n + 1) // cols
+    fig, axes = plt.subplots(rows, cols, figsize=(10, 4 * rows), squeeze=False)
+    for ax, lvl in zip(axes.ravel(), levels):
+        sub = df[df[facet_by] == lvl]
+        sub[col].plot(kind="hist", bins=bins, alpha=0.7, ax=ax)
+        ax.set_title(str(lvl))
+    for ax in axes.ravel()[n:]:
+        ax.axis("off")
+    fig.suptitle(f"{col} distribution by {facet_by}")
+    fig.tight_layout()
+    return _fig_to_png(fig)
