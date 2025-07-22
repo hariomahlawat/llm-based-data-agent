@@ -1,0 +1,64 @@
+import requests
+import re
+from typing import Tuple, Optional, List
+
+OLLAMA_URL = "http://localhost:11434/api/generate"
+MODEL_NAME = "mistral:7b-instruct"   # change if needed
+
+SYSTEM_PROMPT = """You are a Python data analyst.
+Input: a question about a pandas DataFrame named df (with given columns).
+Output: ONLY Python code. No prose, no explanation.
+Rules:
+- Use pandas (pd), matplotlib.pyplot as plt.
+- Store table outputs in variables named result_df, result_series, etc.
+- For figures, use matplotlib and save to a BytesIO 'png' variable (if you create a plot).
+- Do not import anything.
+- Do not read or write files.
+- Use only the provided column names.
+"""
+
+FEW_SHOTS: List[Tuple[str, str]] = [
+    (
+        "Show total sales by region",
+        "result_df = df.groupby('region')['sales'].sum().reset_index()\nprint(result_df.head())"
+    ),
+    (
+        "Histogram of unit_price",
+        "import matplotlib.pyplot as plt\nfrom io import BytesIO\nfig, ax = plt.subplots()\ndf['unit_price'].hist(bins=30, ax=ax)\nax.set_title('unit_price histogram')\npng = BytesIO()\nfig.savefig(png, format='png', bbox_inches='tight')\npng.seek(0)\nplt.close(fig)"
+    ),
+]
+
+def build_prompt(question: str, columns: list[str]) -> str:
+    shots = ""
+    for q, code in FEW_SHOTS:
+        shots += f"Q: {q}\n```python\n{code}\n```\n\n"
+    cols = ", ".join(columns)
+    return f"""{SYSTEM_PROMPT}
+
+DataFrame columns: {cols}
+
+{shots}
+Q: {question}
+```python
+"""
+
+def extract_code(text: str) -> str:
+    # Try fenced block first
+    m = re.search(r"```python(.*?)```", text, re.S)
+    if m:
+        return m.group(1).strip()
+    # else return whole text
+    return text.strip()
+
+def ask_llm(question: str, columns: list[str]) -> str:
+    prompt = build_prompt(question, columns)
+    resp = requests.post(OLLAMA_URL, json={
+        "model": MODEL_NAME,
+        "prompt": prompt,
+        "stream": False,
+        "options": {"temperature": 0.1}
+    }, timeout=120)
+    resp.raise_for_status()
+    raw = resp.json().get("response", "")
+    return extract_code(raw)
+

@@ -1,3 +1,4 @@
+# app/ui_streamlit.py
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -10,6 +11,7 @@ from core.charts import (
 from core.safe_exec import run as safe_run
 from core.error_utils import safe_ui
 from core.logger import get_logger
+from core.llm_driver import ask_llm  # NL -> code via local LLM
 
 # ---------------------------------------------------------------------
 # Page setup
@@ -132,6 +134,48 @@ elif chart_type == "facet line":
         render_chart(facet_line, df, x, y, facet_by)
 
 # ---------------------------------------------------------------------
+# Natural language panel
+# ---------------------------------------------------------------------
+st.divider()
+st.subheader("🤖 Ask in natural language")
+
+with st.expander("LLM → code → safe_exec"):
+    nl_q = st.text_input("Question", placeholder="Show sales trend for last 3 months")
+    if st.button("Generate & run"):
+        if nl_q.strip():
+            with st.spinner("Thinking..."):
+                try:
+                    code = ask_llm(nl_q, list(df.columns))
+                except Exception as e:
+                    st.error("LLM call failed.")
+                    if debug:
+                        st.exception(e)
+                else:
+                    st.code(code, language="python")
+                    ok, result, tb = safe_ui(safe_run)(code, {"df": df, "pd": pd, "plt": plt})
+                    if ok:
+                        locals_out, stdout_txt = result
+                        if stdout_txt.strip():
+                            st.code(stdout_txt, language="text")
+                        for key, val in locals_out.items():
+                            if isinstance(val, pd.DataFrame):
+                                st.write(f"**DataFrame: `{key}`**")
+                                st.dataframe(val)
+                        # Try to display any BytesIO named png
+                        try:
+                            from io import BytesIO
+                            for val in locals_out.values():
+                                if isinstance(val, BytesIO):
+                                    st.image(val)
+                        except Exception:
+                            pass
+                        st.toast("NL query executed!", icon="✅")
+                    else:
+                        st.error("Generated code failed or was blocked.")
+                        if debug:
+                            st.exception(tb)
+
+# ---------------------------------------------------------------------
 # Safe code sandbox
 # ---------------------------------------------------------------------
 st.divider()
@@ -150,7 +194,6 @@ with st.expander("Paste Python code that uses df / pandas / matplotlib"):
                 locals_out, stdout_txt = result
                 if stdout_txt.strip():
                     st.code(stdout_txt, language="text")
-
                 for key, val in locals_out.items():
                     if isinstance(val, pd.DataFrame):
                         st.write(f"**DataFrame: `{key}`**")
@@ -159,4 +202,3 @@ with st.expander("Paste Python code that uses df / pandas / matplotlib"):
                 st.error("Code execution failed or was blocked.")
                 if debug:
                     st.exception(tb)
-
