@@ -1,0 +1,5 @@
+[client]
+# Hide top-right deploy button and other cloud features
+showDeployButton = false
+showErrorDetails = false
+toolbarMode = "viewer"
