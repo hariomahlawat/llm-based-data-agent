@@ -11,6 +11,8 @@ from core.file_loader import load_any
 from core.history import add_record, get_history
 from core.llm_driver import ask_llm, check_model_ready
 from core.logger import get_logger
+from core.multi_file import (compare_numeric_means, find_common_keys,
+                             join_on_common_keys)
 from core.postprocess import extract_outputs, figure_to_png
 from core.reporting import history_to_pdf, history_to_pptx, zip_outputs
 from core.safe_exec import run as safe_run
@@ -50,14 +52,17 @@ logger = get_logger()
 # ---------------------------------------------------------------------
 
 # ---------------------------------------------------------------------
-# File upload
+# File upload (supports one or two files)
 # ---------------------------------------------------------------------
-uploaded = st.file_uploader("Upload CSV or Excel", type=["csv", "xlsx"])
-if not uploaded:
+uploaded_files = st.file_uploader(
+    "Upload CSV or Excel", type=["csv", "xlsx"], accept_multiple_files=True
+)
+if not uploaded_files:
     st.info("Upload a file to begin.")
     st.stop()
 
-df = load_any(uploaded)
+df = load_any(uploaded_files[0])
+df2 = load_any(uploaded_files[1]) if len(uploaded_files) > 1 else None
 
 # ---------------------------------------------------------------------
 # History side panel and exports
@@ -161,6 +166,31 @@ st.dataframe(df.head())
 
 st.subheader("Basic Summary")
 st.json(basic_summary(df))
+
+if df2 is not None:
+    st.divider()
+    st.subheader("Multi-file Workflows")
+    if st.button("Show common keys"):
+        st.write(find_common_keys(df, df2))
+
+    with st.expander("Join datasets"):
+        join_type = st.selectbox(
+            "Join type",
+            ["inner", "left", "right", "outer"],
+            key="join_type",
+        )
+        if st.button("Join", key="join_btn"):
+            try:
+                joined = join_on_common_keys(df, df2, how=join_type)
+            except ValueError:
+                st.error("No common keys found")
+            else:
+                st.dataframe(joined.head())
+
+    with st.expander("Compare numeric means"):
+        if st.button("Compare", key="compare_btn"):
+            metrics = compare_numeric_means(df, df2)
+            st.json(metrics)
 
 
 # ---------------------------------------------------------------------
