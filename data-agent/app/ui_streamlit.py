@@ -8,34 +8,63 @@ from core.charts import (
     line_plot, bar_plot, hist_plot, box_plot, scatter_plot, facet_line
 )
 from core.safe_exec import run as safe_run
+from core.error_utils import safe_ui
+from core.logger import get_logger
 
+# ---------------------------------------------------------------------
+# Page setup
+# ---------------------------------------------------------------------
 st.set_page_config(page_title="Data Summarization & Charting Agent", layout="wide")
 st.title("📊 Data Summarization & Charting Agent")
 
-uploaded = st.file_uploader("Upload CSV or Excel", type=["csv", "xlsx"])
+# Debug toggle
+debug = st.sidebar.checkbox("Show debug tracebacks", value=False)
+logger = get_logger()
 
+# ---------------------------------------------------------------------
+# File upload
+# ---------------------------------------------------------------------
+uploaded = st.file_uploader("Upload CSV or Excel", type=["csv", "xlsx"])
 if not uploaded:
     st.info("Upload a file to begin.")
     st.stop()
 
-# ---- DataFrame ----
 df = load_any(uploaded)
 
-# ---- Optional: date parsing ----
+# ---------------------------------------------------------------------
+# Optional: date parsing
+# ---------------------------------------------------------------------
 with st.expander("🗓️ Date parsing"):
-    date_col = st.selectbox(
-        "Column to parse as datetime (optional)",
-        ["<none>"] + list(df.columns)
-    )
+    date_col = st.selectbox("Column to parse as datetime (optional)", ["<none>"] + list(df.columns))
     if date_col != "<none>":
         df = coerce_datetime(df, date_col)
 
+# ---------------------------------------------------------------------
+# Preview & Summary
+# ---------------------------------------------------------------------
 st.subheader("Preview")
 st.dataframe(df.head())
 
 st.subheader("Basic Summary")
 st.json(basic_summary(df))
 
+# ---------------------------------------------------------------------
+# Helper for rendering charts with error handling
+# ---------------------------------------------------------------------
+def render_chart(fn, *args, **kwargs):
+    ok, png, tb = safe_ui(fn)(*args, **kwargs)
+    if ok:
+        st.image(png)
+        st.download_button("Download PNG", data=png, file_name="chart.png", mime="image/png")
+        st.toast("Chart created!", icon="✅")
+    else:
+        st.error("Chart failed. Please adjust inputs.")
+        if debug:
+            st.exception(tb)
+
+# ---------------------------------------------------------------------
+# Charts UI
+# ---------------------------------------------------------------------
 st.divider()
 st.subheader("Charts")
 
@@ -48,14 +77,12 @@ num_cols = df.select_dtypes("number").columns.tolist()
 all_cols = df.columns.tolist()
 cat_cols = [c for c in all_cols if c not in num_cols]
 
-png = None
-
 if chart_type == "line":
     x = st.selectbox("X axis", all_cols)
     y = st.selectbox("Y axis (numeric)", num_cols)
     log_y = st.checkbox("Log scale Y")
     if st.button("Plot line"):
-        png = line_plot(df, x, y, log_y=log_y)
+        render_chart(line_plot, df, x, y, log_y=log_y)
 
 elif chart_type == "bar":
     x = st.selectbox("Category (x)", all_cols)
@@ -65,21 +92,24 @@ elif chart_type == "bar":
     stacked = st.checkbox("Stacked", value=True)
     if st.button("Plot bar"):
         y_val = None if y_opt == "<count>" else y_opt
-        png = bar_plot(df, x, y_val, agg=agg, stacked=stacked,
-                       hue=None if hue == "<none>" else hue)
+        render_chart(
+            bar_plot, df, x, y_val,
+            agg=agg, stacked=stacked,
+            hue=None if hue == "<none>" else hue
+        )
 
 elif chart_type == "histogram":
     cols = st.multiselect("Numeric columns", num_cols, default=num_cols[:1])
     bins = st.slider("Bins", 5, 100, 30)
     log_y = st.checkbox("Log scale Y")
     if st.button("Plot histogram"):
-        png = hist_plot(df, cols, bins=bins, log_y=log_y)
+        render_chart(hist_plot, df, cols, bins=bins, log_y=log_y)
 
 elif chart_type == "box":
     cols = st.multiselect("Numeric columns", num_cols, default=num_cols[:1])
     by = st.selectbox("Group by (optional category)", ["<none>"] + cat_cols)
     if st.button("Plot box"):
-        png = box_plot(df, cols, by=None if by == "<none>" else by)
+        render_chart(box_plot, df, cols, by=None if by == "<none>" else by)
 
 elif chart_type == "scatter":
     x = st.selectbox("X axis (numeric)", num_cols)
@@ -88,23 +118,22 @@ elif chart_type == "scatter":
     log_x = st.checkbox("Log X")
     log_y = st.checkbox("Log Y")
     if st.button("Plot scatter"):
-        png = scatter_plot(df, x, y,
-                           hue=None if hue == "<none>" else hue,
-                           log_x=log_x, log_y=log_y)
+        render_chart(
+            scatter_plot, df, x, y,
+            hue=None if hue == "<none>" else hue,
+            log_x=log_x, log_y=log_y
+        )
 
 elif chart_type == "facet line":
     x = st.selectbox("X axis", all_cols)
     y = st.selectbox("Y axis (numeric)", num_cols)
     facet_by = st.selectbox("Facet by (category)", cat_cols)
     if st.button("Plot facets"):
-        png = facet_line(df, x, y, facet_by)
+        render_chart(facet_line, df, x, y, facet_by)
 
-if png:
-    st.image(png)
-    st.download_button("Download PNG", data=png,
-                       file_name="chart.png", mime="image/png")
-
-# ---------------- Safe Exec Panel ----------------
+# ---------------------------------------------------------------------
+# Safe code sandbox
+# ---------------------------------------------------------------------
 st.divider()
 st.subheader("🔒 Run custom code (safe sandbox)")
 
@@ -116,12 +145,9 @@ with st.expander("Paste Python code that uses df / pandas / matplotlib"):
     )
     if st.button("Run code safely"):
         if code.strip():
-            try:
-                locals_out, stdout_txt = safe_run(
-                    code,
-                    {"df": df, "pd": pd, "plt": plt}
-                )
-
+            ok, result, tb = safe_ui(safe_run)(code, {"df": df, "pd": pd, "plt": plt})
+            if ok:
+                locals_out, stdout_txt = result
                 if stdout_txt.strip():
                     st.code(stdout_txt, language="text")
 
@@ -129,6 +155,8 @@ with st.expander("Paste Python code that uses df / pandas / matplotlib"):
                     if isinstance(val, pd.DataFrame):
                         st.write(f"**DataFrame: `{key}`**")
                         st.dataframe(val)
-            except Exception as e:
-                st.error(f"Execution blocked or failed: {e}")
+            else:
+                st.error("Code execution failed or was blocked.")
+                if debug:
+                    st.exception(tb)
 
