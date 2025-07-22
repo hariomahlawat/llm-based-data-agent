@@ -45,9 +45,17 @@ st.title("📊 Data Summarization & Charting Agent")
 
 # Debug toggle
 debug = st.sidebar.checkbox("Show debug tracebacks", value=False)
-theme = st.sidebar.selectbox("Theme", ["light", "dark"], index=0)
-plt.style.use("dark_background" if theme == "dark" else "default")
+theme_base = st.get_option("theme.base")
+plt.style.use("dark_background" if theme_base == "dark" else "default")
 logger = get_logger()
+
+with st.sidebar.expander("Guide", expanded=True):
+    st.markdown(
+        "1. **Upload** a CSV or Excel file.\n"
+        "2. **Preview** the data and summary on the right.\n"
+        "3. Use the **Charts** section to create visuals or ask questions in the **NL panel**.\n"
+        "4. Download results from the **Export** section."
+    )
 
 # ---------------------------------------------------------------------
 
@@ -161,11 +169,12 @@ with st.expander("🧹 Data prep wizards"):
 # ---------------------------------------------------------------------
 # Preview & Summary
 # ---------------------------------------------------------------------
-st.subheader("Preview")
-st.dataframe(df.head())
-
-st.subheader("Basic Summary")
-st.json(basic_summary(df))
+st.subheader("Preview & Summary")
+col_prev, col_sum = st.columns((3, 2))
+with col_prev:
+    st.dataframe(df.head())
+with col_sum:
+    st.json(basic_summary(df))
 
 if df2 is not None:
     st.divider()
