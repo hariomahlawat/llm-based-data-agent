@@ -13,6 +13,8 @@ from core.error_utils import safe_ui
 from core.logger import get_logger
 from core.llm_driver import ask_llm, check_model_ready
 from core.postprocess import extract_outputs, figure_to_png
+from core.history import get_history, add_record
+from core.reporting import history_to_pdf, history_to_pptx, zip_outputs
 
 # ---------------------------------------------------------------------
 # Page setup
@@ -45,6 +47,8 @@ debug = st.sidebar.checkbox("Show debug tracebacks", value=False)
 logger = get_logger()
 
 # ---------------------------------------------------------------------
+
+# ---------------------------------------------------------------------
 # File upload
 # ---------------------------------------------------------------------
 uploaded = st.file_uploader("Upload CSV or Excel", type=["csv", "xlsx"])
@@ -53,6 +57,70 @@ if not uploaded:
     st.stop()
 
 df = load_any(uploaded)
+
+# ---------------------------------------------------------------------
+# History side panel and exports
+# ---------------------------------------------------------------------
+history = get_history()
+with st.sidebar.expander("History", expanded=False):
+    for idx, item in enumerate(reversed(history)):
+        st.markdown(f"**{len(history) - idx}. {item.get('prompt', 'manual')}**")
+        st.code(item.get("code", ""), language="python")
+        col1, col2 = st.columns(2)
+        if col1.button("Re-run", key=f"rerun_{idx}"):
+            ok, result, tb = safe_ui(safe_run)(
+                item.get("code", ""), {"df": df, "pd": pd, "plt": plt}
+            )
+            if ok:
+                locals_out, stdout_txt = result
+                if stdout_txt.strip():
+                    st.code(stdout_txt, language="text")
+                dfs, pngs, figs, texts = extract_outputs(locals_out)
+                for fig in figs:
+                    try:
+                        pngs.append(figure_to_png(fig))
+                    except Exception:
+                        pass
+                for t in texts:
+                    st.write(t)
+                for df_out in dfs:
+                    st.dataframe(df_out)
+                for img in pngs:
+                    st.image(img)
+                add_record(
+                    item.get("prompt", "manual"),
+                    item.get("code", ""),
+                    [df_out.to_csv(index=False) for df_out in dfs],
+                    [img.getvalue() for img in pngs],
+                )
+            else:
+                st.error("Code execution failed.")
+                if debug:
+                    st.exception(tb)
+        if col2.button("Edit", key=f"edit_{idx}"):
+            st.session_state["code_edit"] = item.get("code", "")
+            st.experimental_rerun()
+
+with st.sidebar.expander("Export", expanded=False):
+    if history:
+        st.download_button(
+            "Download PDF",
+            data=history_to_pdf(history).getvalue(),
+            file_name="report.pdf",
+            mime="application/pdf",
+        )
+        st.download_button(
+            "Download PPTX",
+            data=history_to_pptx(history).getvalue(),
+            file_name="report.pptx",
+            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        )
+        st.download_button(
+            "Download ZIP",
+            data=zip_outputs(history).getvalue(),
+            file_name="artifacts.zip",
+            mime="application/zip",
+        )
 
 # ---------------------------------------------------------------------
 # Optional: date parsing
@@ -205,6 +273,13 @@ with st.expander("LLM → code → safe_exec"):
                         for img in pngs:
                             st.image(img)
 
+                        add_record(
+                            nl_q,
+                            code,
+                            [df_out.to_csv(index=False) for df_out in dfs],
+                            [img.getvalue() for img in pngs],
+                        )
+
                         st.toast("NL query executed!", icon="✅")
                     else:
                         st.error("Generated code failed or was blocked.")
@@ -221,6 +296,7 @@ with st.expander("Paste Python code that uses df / pandas / matplotlib"):
     code = st.text_area(
         "Code",
         height=200,
+        value=st.session_state.pop("code_edit", ""),
         placeholder="e.g.\nresult = df.groupby('region')['sales'].sum().reset_index()\nprint(result.head())"
     )
     if st.button("Run code safely"):
@@ -244,6 +320,13 @@ with st.expander("Paste Python code that uses df / pandas / matplotlib"):
                     st.dataframe(df_out)
                 for img in pngs:
                     st.image(img)
+
+                add_record(
+                    "manual",
+                    code,
+                    [df_out.to_csv(index=False) for df_out in dfs],
+                    [img.getvalue() for img in pngs],
+                )
             else:
                 st.error("Code execution failed or was blocked.")
                 if debug:
