@@ -11,7 +11,8 @@ from core.charts import (
 from core.safe_exec import run as safe_run
 from core.error_utils import safe_ui
 from core.logger import get_logger
-from core.llm_driver import ask_llm  # NL -> code via local LLM
+from core.llm_driver import ask_llm, check_model_ready
+from core.postprocess import extract_outputs, figure_to_png
 
 # ---------------------------------------------------------------------
 # Page setup
@@ -142,8 +143,6 @@ st.subheader("🤖 Ask in natural language")
 with st.expander("LLM → code → safe_exec"):
     nl_q = st.text_input("Question", placeholder="Show sales trend for last 3 months")
 
-    # Quick model status
-    from core.llm_driver import check_model_ready
     ok_model, msg = check_model_ready()
     if not ok_model:
         st.warning(f"LLM not available: {msg}")
@@ -167,24 +166,27 @@ with st.expander("LLM → code → safe_exec"):
                         locals_out, stdout_txt = result
                         if stdout_txt.strip():
                             st.code(stdout_txt, language="text")
-                        for key, val in locals_out.items():
-                            if isinstance(val, pd.DataFrame):
-                                st.write(f"**DataFrame: `{key}`**")
-                                st.dataframe(val)
-                        # bytes images
-                        try:
-                            from io import BytesIO
-                            for val in locals_out.values():
-                                if isinstance(val, BytesIO):
-                                    st.image(val)
-                        except Exception:
-                            pass
+
+                        # Extract & render
+                        dfs, pngs, figs, texts = extract_outputs(locals_out)
+                        for fig in figs:
+                            try:
+                                pngs.append(figure_to_png(fig))
+                            except Exception:
+                                pass
+
+                        for t in texts:
+                            st.write(t)
+                        for df_out in dfs:
+                            st.dataframe(df_out)
+                        for img in pngs:
+                            st.image(img)
+
                         st.toast("NL query executed!", icon="✅")
                     else:
                         st.error("Generated code failed or was blocked.")
                         if debug:
                             st.exception(tb)
-
 
 # ---------------------------------------------------------------------
 # Safe code sandbox
@@ -205,10 +207,20 @@ with st.expander("Paste Python code that uses df / pandas / matplotlib"):
                 locals_out, stdout_txt = result
                 if stdout_txt.strip():
                     st.code(stdout_txt, language="text")
-                for key, val in locals_out.items():
-                    if isinstance(val, pd.DataFrame):
-                        st.write(f"**DataFrame: `{key}`**")
-                        st.dataframe(val)
+
+                dfs, pngs, figs, texts = extract_outputs(locals_out)
+                for fig in figs:
+                    try:
+                        pngs.append(figure_to_png(fig))
+                    except Exception:
+                        pass
+
+                for t in texts:
+                    st.write(t)
+                for df_out in dfs:
+                    st.dataframe(df_out)
+                for img in pngs:
+                    st.image(img)
             else:
                 st.error("Code execution failed or was blocked.")
                 if debug:
