@@ -64,24 +64,3 @@ jobs:
       - name: Push image
         run: docker push ghcr.io/${{ github.repository }}/data-agent:${{ github.ref_name }}
 
-  windows-exe:
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: build
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Install deps
-        run: pip install pyinstaller -r data-agent/requirements.txt
-
-      - name: Build exe
-        run: pyinstaller --onefile data-agent/app/ui_streamlit.py --name data_agent
-
-      - name: Upload exe artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: data_agent_windows
-          path: dist/data_agent.exe

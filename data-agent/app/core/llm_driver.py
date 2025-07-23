@@ -12,7 +12,7 @@ import requests  # type: ignore
 # ---------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------
-# If your Streamlit app runs inside Docker and Ollama runs on host:
+# If running inside Docker and Ollama runs on host:
 # OLLAMA_URL = "http://host.docker.internal:11434/api"
 OLLAMA_URL = "http://localhost:11434/api"
 
