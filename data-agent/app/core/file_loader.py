@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 from typing import IO, Union
 
+from .config import settings
+
 import pandas as pd
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "data"))
@@ -18,9 +20,12 @@ def load_any(file: Union[str, Path, IO[bytes]]) -> pd.DataFrame:
     name = getattr(file, "name", str(file))
     if hasattr(file, "read"):
         _maybe_cache(file, name)
-    if name.endswith(".csv"):
+    ext = Path(name).suffix.lstrip(".")
+    if ext not in settings.allowed_file_types:
+        raise ValueError(f"Unsupported file type: {name}")
+    if ext == "csv":
         return pd.read_csv(file)
-    if name.endswith((".xls", ".xlsx")):
+    if ext in {"xls", "xlsx"}:
         return pd.read_excel(file)
     raise ValueError(f"Unsupported file type: {name}")
 

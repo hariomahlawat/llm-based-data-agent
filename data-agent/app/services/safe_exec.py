@@ -7,6 +7,8 @@ from io import StringIO
 from types import CodeType
 from typing import Any, Dict, Tuple
 
+from app.core.config import settings
+
 try:  # resource is Unix only
     import resource
 except Exception:  # pragma: no cover - windows
@@ -52,6 +54,12 @@ def _worker(code_str: str, context: Dict[str, Any], q: mp.Queue, timeout: int) -
     if resource is not None:
         # limit CPU seconds roughly equal to timeout
         resource.setrlimit(resource.RLIMIT_CPU, (timeout, timeout))
+        # limit address space to configured memory in bytes
+        max_mem = settings.safe_exec_mem_mb * 1_048_576
+        try:
+            resource.setrlimit(resource.RLIMIT_AS, (max_mem, max_mem))
+        except ValueError:
+            pass
 
     def _alarm_handler(signum, frame):  # pragma: no cover - relies on OS
         raise TimeoutError("Time limit exceeded")
@@ -74,8 +82,9 @@ def _worker(code_str: str, context: Dict[str, Any], q: mp.Queue, timeout: int) -
 
 def run(code: str, context: Dict[str, Any], timeout: int = 5) -> Tuple[Dict[str, Any], str]:
     """Safely execute code with a time limit."""
-    q: mp.Queue = mp.Queue()
-    proc = mp.Process(target=_worker, args=(code, context, q, timeout))
+    ctx = mp.get_context("spawn")
+    q: mp.Queue = ctx.Queue()
+    proc = ctx.Process(target=_worker, args=(code, context, q, timeout))
     proc.start()
     proc.join(timeout)
     if proc.is_alive():
