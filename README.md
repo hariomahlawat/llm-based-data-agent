@@ -125,6 +125,15 @@ make lint
 make docker
 ```
 
+
+### 6.5 FastAPI server
+
+```bash
+uvicorn app.api:app --reload
+```
+
+This exposes endpoints like `/upload`, `/summary/{id}`, `/chart/{id}`, `/nl2code/{id}` and `/run_code/{id}`.
+
 ---
 
 ## 7. Repository Layout
