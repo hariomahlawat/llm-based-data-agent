@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import os
 from functools import lru_cache
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import pandas as pd
 import requests  # type: ignore
@@ -23,17 +23,24 @@ PREFERRED_MODELS: List[str] = [
     "phi3:3.8b-mini-instruct",
 ]
 
-SYSTEM_PROMPT = """You are a Python data analyst.
-Input: a question about a pandas DataFrame named df (with given schema).
-Output: a JSON object with keys 'intent' and 'code'. No extra prose.
+SYSTEM_PROMPT = """You translate English questions into safe pandas and matplotlib code.
+Input: a question about a pandas DataFrame named df with a provided schema.
+Output: return only a JSON object with keys 'intent' and 'code'. No extra prose.
 Rules:
-- Use pandas as pd and matplotlib.pyplot as plt if plotting.
-- Store table outputs in variables like result_df/result_series.
-- If you create a plot, save it to a BytesIO variable named png.
-- Do not import anything or access disk/network.
-- Use only the provided column names.
-- Return valid JSON only, no code fences.
+    - Use pandas as pd and matplotlib.pyplot as plt if plotting.
+    - Store table outputs in variables like result_df or result_series.
+    - If you create a plot, save it to a BytesIO variable named png.
+    - Do not import anything or access disk/network.
+    - Only access the provided column names.
+    - Return valid JSON only, no code fences.
 """
+
+# Keep last few conversation turns so the model has short context
+HISTORY_LEN = 3
+CONVERSATION: List[Tuple[str, str]] = []
+
+# Cache by question and DataFrame signature
+QUESTION_CACHE: Dict[Tuple[str, str], Tuple[str, str]] = {}
 
 FEW_SHOTS: List[Tuple[str, str]] = [
     (
@@ -71,6 +78,20 @@ def _schema_desc(df: pd.DataFrame, redact_cols: List[str] | None = None) -> str:
     return "\n".join(lines)
 
 
+def _df_signature(df: pd.DataFrame) -> str:
+    """Return a stable signature for caching."""
+    parts = []
+    for col in df.columns:
+        parts.append(f"{col}:{df[col].dtype}")
+    return ";".join(parts)
+
+
+def _update_history(question: str, code: str) -> None:
+    CONVERSATION.append((question, code))
+    if len(CONVERSATION) > HISTORY_LEN:
+        CONVERSATION.pop(0)
+
+
 # ---------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------
@@ -83,13 +104,21 @@ def _extract_json(text: str) -> tuple[str, str]:
 
 
 def _build_prompt(
-    question: str, df: pd.DataFrame, redact_cols: List[str] | None = None
+    question: str,
+    df: pd.DataFrame,
+    history: List[Tuple[str, str]] | None = None,
+    redact_cols: List[str] | None = None,
 ) -> str:
     shots = ""
     for q, code in FEW_SHOTS:
         shots += f'Q: {q}\n{{"intent": "demo", "code": "{code}"}}\n\n'
+    history_txt = ""
+    for q, a in history or []:
+        history_txt += f"Q: {q}\nA: {a}\n\n"
     schema = _schema_desc(df, redact_cols=redact_cols)
-    return f"{SYSTEM_PROMPT}\n\nDataFrame schema:\n{schema}\n\n{shots}Q: {question}\n"
+    return (
+        f"{SYSTEM_PROMPT}\n\nDataFrame schema:\n{schema}\n\n{history_txt}{shots}Q: {question}\n"
+    )
 
 
 def _post_ollama(path: str, payload: dict, timeout: int = 120) -> dict:
@@ -123,11 +152,15 @@ def check_model_ready() -> tuple[bool, str, str]:
     return False, "No models installed. Try: ollama pull mistral:7b-instruct", ""
 
 
-@lru_cache(maxsize=128)
 def ask_llm(question: str, df: pd.DataFrame, retries: int = 1) -> tuple[str, str]:
     ok, msg, model = check_model_ready()
     if not ok:
         return "", f"# LLM unavailable: {msg}"
+
+    sig = _df_signature(df)
+    cache_key = (question, sig)
+    if cache_key in QUESTION_CACHE:
+        return QUESTION_CACHE[cache_key]
 
     error_msg = ""
     intent = ""
@@ -138,7 +171,8 @@ def ask_llm(question: str, df: pd.DataFrame, retries: int = 1) -> tuple[str, str
             q += f"\nPrevious attempt failed with: {error_msg}\nReturn fixed JSON only."
         pii_env = os.environ.get("PII_COLUMNS", "")
         redact_cols = [c.strip() for c in pii_env.split(",") if c.strip()]
-        prompt = _build_prompt(q, df, redact_cols=redact_cols)
+        history = CONVERSATION[-HISTORY_LEN:]
+        prompt = _build_prompt(q, df, history=history, redact_cols=redact_cols)
         resp = _post_ollama(
             "/generate",
             {
@@ -157,4 +191,7 @@ def ask_llm(question: str, df: pd.DataFrame, retries: int = 1) -> tuple[str, str
             break
         except Exception as e:
             error_msg = str(e)
+
+    QUESTION_CACHE[cache_key] = (intent, code)
+    _update_history(question, code)
     return intent, code
