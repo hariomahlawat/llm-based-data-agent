@@ -210,6 +210,12 @@ Choose a permissive OSS license (MIT or Apache-2.0) unless you have constraints.
 Initial concept and implementation:&#x20;
 
 ---
+## 14. React UI Prototype
+
+An experimental React + Vite frontend lives under `frontend/`. It uses
+MUI components together with Recharts for interactive charts. Run `npm install` and then `npm run dev` inside that directory to start
+the development server.
+
 
 Happy building.
 
