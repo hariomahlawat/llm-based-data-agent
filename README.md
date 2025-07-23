@@ -195,6 +195,8 @@ root/
 4. Validate AST for allowed nodes (Import, Call, Assign, etc.).
 5. Execute and capture DataFrame or Figure objects.
 6. Return result to UI.
+7. Cache previous questions and reuse answers when possible.
+8. Include recent conversation history in the prompt for better context.
 
 ---
 
