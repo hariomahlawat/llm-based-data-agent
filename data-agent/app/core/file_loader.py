@@ -6,7 +6,7 @@ from .config import settings
 
 import pandas as pd
 
-DATA_DIR = Path(os.environ.get("DATA_DIR", "data"))
+DATA_DIR = Path(os.environ.get("DATA_DIR", settings.data_dir))
 
 
 def _maybe_cache(file: IO[bytes], name: str) -> None:

@@ -4,14 +4,28 @@ services:
     build:
       context: ./data-agent
       dockerfile: Dockerfile.api
+    environment:
+      - DATA_DIR=/data
+      - DB_FILE=/data/datasets.db
+      - MAX_FILE_SIZE=5242880
+      - ALLOWED_FILE_TYPES=csv,xlsx
     volumes:
-      - ./data-agent/app:/app/app
+      - data_files:/data
     ports:
       - "8000:8000"
   frontend:
     build: ./frontend
     ports:
       - "3000:80"
+  proxy:
+    image: nginx:alpine
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api
+      - frontend
+    ports:
+      - "8080:80"
   ollama:
     image: ollama/ollama:latest
     restart: unless-stopped
@@ -20,4 +34,5 @@ services:
     volumes:
       - ollama_data:/root/.ollama
 volumes:
+  data_files:
   ollama_data:

@@ -90,7 +90,7 @@ async def upload(file: UploadFile = File(...)) -> UploadResponse:
     ext = Path(file.filename).suffix.lstrip(".")
     if ext not in settings.allowed_file_types:
         return JSONResponse(status_code=400, content={"error": "file type not allowed"})
-    ds_path = Path("data")
+    ds_path = Path(settings.data_dir)
     ds_path.mkdir(exist_ok=True)
     ds_id = str(uuid.uuid4())
     path = ds_path / f"{ds_id}_{Path(file.filename).name}"
