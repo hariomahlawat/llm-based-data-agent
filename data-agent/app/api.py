@@ -22,8 +22,8 @@ from .core.charts import (
 )
 from .core.file_loader import load_any
 from .core.llm_driver import ask_llm
-from .core.postprocess import extract_outputs, figure_to_png
-from .core.safe_exec import run as safe_run
+from .services.postprocess import extract_outputs, figure_to_png
+from .services.safe_exec import run as safe_run
 
 app = FastAPI(title="Data Agent API")
 
