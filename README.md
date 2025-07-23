@@ -257,3 +257,10 @@ the development server.
 
 Happy building.
 
+---
+
+## Offline Deployment on Windows
+
+For step-by-step instructions to run the stack without internet access,
+see [docs/OFFLINE_WINDOWS.md](docs/OFFLINE_WINDOWS.md).
+
