@@ -108,7 +108,7 @@ and the React UI at [http://localhost:3000](http://localhost:3000)
 ```bash
 python -m venv .venv
 source .venv/Scripts/activate  # Windows: .venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -r data-agent/requirements.txt
 streamlit run app/ui_streamlit.py
 ```
 
@@ -135,6 +135,20 @@ uvicorn app.api:app --reload
 
 This exposes endpoints like `/upload`, `/summary/{id}`, `/chart/{id}`, `/nl2code/{id}` and `/run_code/{id}`.
 
+### 6.6 Running tests
+
+Install the runtime and dev requirements first:
+
+```bash
+pip install -r data-agent/requirements.txt -r requirements-dev.txt
+```
+
+Then execute the test suite with the repository root on the `PYTHONPATH`:
+
+```bash
+PYTHONPATH=. pytest -q
+```
+
 ---
 
 ## 7. Repository Layout
@@ -151,7 +165,8 @@ root/
 ├── data/                      # User uploaded data (gitignored)
 ├── Dockerfile
 ├── docker-compose.yml
-├── requirements.txt
+├── data-agent/
+│   └── requirements.txt
 └── README.md
 ```
 

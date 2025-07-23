@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 from functools import lru_cache
 from typing import List, Tuple
 
@@ -21,7 +20,7 @@ PREFERRED_MODELS: List[str] = [
     "mistral:7b-instruct",
     "llama3:8b-instruct",
     "llama3:8b-instruct-q3_K_L",
-    "phi3:3.8b-mini-instruct"
+    "phi3:3.8b-mini-instruct",
 ]
 
 SYSTEM_PROMPT = """You are a Python data analyst.
@@ -39,14 +38,14 @@ Rules:
 FEW_SHOTS: List[Tuple[str, str]] = [
     (
         "Show total sales by region",
-        "result_df = df.groupby('region')['sales'].sum().reset_index()\nprint(result_df.head())"
+        "result_df = df.groupby('region')['sales'].sum().reset_index()\nprint(result_df.head())",
     ),
     (
         "Histogram of unit_price",
         "from io import BytesIO\nfig, ax = plt.subplots()\n"
         "df['unit_price'].hist(bins=30, ax=ax)\nax.set_title('unit_price histogram')\n"
         "png = BytesIO()\nfig.savefig(png, format='png', bbox_inches='tight')\n"
-        "png.seek(0)\nplt.close(fig)"
+        "png.seek(0)\nplt.close(fig)",
     ),
 ]
 
@@ -71,6 +70,7 @@ def _schema_desc(df: pd.DataFrame, redact_cols: List[str] | None = None) -> str:
         lines.append(f"- {col} ({dtype}): {sample}")
     return "\n".join(lines)
 
+
 # ---------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------
@@ -82,20 +82,21 @@ def _extract_json(text: str) -> tuple[str, str]:
         return "", text.strip()
 
 
-def _build_prompt(question: str, df: pd.DataFrame, redact_cols: List[str] | None = None) -> str:
+def _build_prompt(
+    question: str, df: pd.DataFrame, redact_cols: List[str] | None = None
+) -> str:
     shots = ""
     for q, code in FEW_SHOTS:
-        shots += f"Q: {q}\n{{\"intent\": \"demo\", \"code\": \"{code}\"}}\n\n"
+        shots += f'Q: {q}\n{{"intent": "demo", "code": "{code}"}}\n\n'
     schema = _schema_desc(df, redact_cols=redact_cols)
-    return (
-        f"{SYSTEM_PROMPT}\n\nDataFrame schema:\n{schema}\n\n{shots}Q: {question}\n"
-    )
+    return f"{SYSTEM_PROMPT}\n\nDataFrame schema:\n{schema}\n\n{shots}Q: {question}\n"
 
 
 def _post_ollama(path: str, payload: dict, timeout: int = 120) -> dict:
     r = requests.post(f"{OLLAMA_URL}{path}", json=payload, timeout=timeout)
     r.raise_for_status()
     return r.json()
+
 
 # ---------------------------------------------------------------------
 # Public API
