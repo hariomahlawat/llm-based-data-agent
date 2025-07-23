@@ -24,6 +24,7 @@ from .core.charts import (
     scatter_plot,
 )
 from .core.file_loader import load_any
+from .core.config import settings
 from .core.llm_driver import ask_llm
 from .services.postprocess import extract_outputs, figure_to_png
 from .services.safe_exec import run as safe_run
@@ -84,6 +85,11 @@ async def _unhandled(request: Request, exc: Exception):
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)) -> UploadResponse:
     data = await file.read()
+    if len(data) > settings.max_file_size:
+        return JSONResponse(status_code=400, content={"error": "file too large"})
+    ext = Path(file.filename).suffix.lstrip(".")
+    if ext not in settings.allowed_file_types:
+        return JSONResponse(status_code=400, content={"error": "file type not allowed"})
     ds_path = Path("data")
     ds_path.mkdir(exist_ok=True)
     ds_id = str(uuid.uuid4())
