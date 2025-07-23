@@ -13,7 +13,7 @@ dev: $(VENV)/bin/activate
 	$(VENV)/bin/streamlit run data-agent/app/ui_streamlit.py
 
 docker:
-	docker compose -f data-agent/docker-compose.yml up --build
+	docker compose up --build
 
 lint:
 	$(VENV)/bin/pre-commit run --files $(shell git ls-files '*.py')

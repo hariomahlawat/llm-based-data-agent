@@ -100,7 +100,8 @@ Teams often need quick exploratory analysis without sending sensitive data to th
 docker compose up --build
 ```
 
-Visit [http://localhost:8501](http://localhost:8501)
+Backend will be available at [http://localhost:8000](http://localhost:8000)
+and the React UI at [http://localhost:3000](http://localhost:3000)
 
 ### 6.3 Local venv (no Docker)
 
