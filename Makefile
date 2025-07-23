@@ -10,7 +10,7 @@ $(VENV)/bin/activate: requirements-dev.txt data-agent/requirements.txt
 .PHONY: dev docker lint fmt test
 
 dev: $(VENV)/bin/activate
-	$(VENV)/bin/streamlit run data-agent/app/ui_streamlit.py
+    $(VENV)/bin/uvicorn app.api:app --reload
 
 docker:
 	docker compose up --build

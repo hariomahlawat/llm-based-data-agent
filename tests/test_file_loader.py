@@ -1,9 +1,6 @@
 import io
-import os
-from pathlib import Path
-
-import pandas as pd
 import importlib
+import pandas as pd
 
 
 def test_no_cache(monkeypatch, tmp_path):

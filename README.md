@@ -47,7 +47,7 @@ Teams often need quick exploratory analysis without sending sensitive data to th
 
 | Layer       | Choice (initial)                               | Notes                                                |
 | ----------- | ---------------------------------------------- | ---------------------------------------------------- |
-| UI          | Streamlit                                      | Fast to prototype. Can add FastAPI + React later.    |
+| UI          | React (Vite + MUI)                             | Modern web frontend. |
 | Data engine | pandas, numpy                                  | Mature ecosystem.                                    |
 | Charts      | matplotlib                                     | Requirement. Others optional later (plotly, altair). |
 | LLM runtime | llama.cpp or ollama                            | Runs Mistral, Phi, Qwen etc locally.                 |
@@ -59,8 +59,8 @@ Teams often need quick exploratory analysis without sending sensitive data to th
 
 ## 4. High Level Architecture
 
-1. **Frontend (Streamlit)**
-   - File uploader, prompt box, chart and table viewers.
+1. **Frontend (React)**
+   - React app with file uploader, prompt box, chart and table viewers.
 2. **Controller**
    - Routes user intent: direct UI selections or NL prompt.
 3. **LLM Interpreter** (Phase 2)
@@ -109,7 +109,8 @@ and the React UI at [http://localhost:3000](http://localhost:3000)
 python -m venv .venv
 source .venv/Scripts/activate  # Windows: .venv\Scripts\Activate.ps1
 pip install -r data-agent/requirements.txt
-streamlit run app/ui_streamlit.py
+uvicorn app.api:app --reload
+cd frontend && npm install && npm run dev
 ```
 
 ### 6.4 Makefile Shortcuts
@@ -156,17 +157,16 @@ PYTHONPATH=. pytest -q
 ```
 root/
 ├── app/
-│   ├── ui_streamlit.py        # Streamlit entry point
 │   └── core/
 │       ├── file_loader.py     # CSV/XLSX ingestion
 │       ├── analysis.py        # Simple summaries
 │       ├── charts.py          # Matplotlib rendering helpers
 │       └── llm_driver.py      # NL -> code bridge (placeholder)
 ├── data/                      # User uploaded data (gitignored)
-├── Dockerfile
 ├── docker-compose.yml
 ├── data-agent/
-│   └── requirements.txt
+│   ├── requirements.txt
+│   └── Dockerfile.api
 └── README.md
 ```
 
