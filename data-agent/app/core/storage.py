@@ -3,7 +3,9 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-DB_FILE = Path(__file__).resolve().parents[2] / "datasets.db"
+from .config import settings
+
+DB_FILE = Path(settings.db_file)
 DB_FILE.parent.mkdir(exist_ok=True)
 
 

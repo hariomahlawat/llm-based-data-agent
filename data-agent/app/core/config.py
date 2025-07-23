@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     allowed_file_types: List[str] = Field(default_factory=lambda: ["csv", "xlsx"], env="ALLOWED_FILE_TYPES")
     log_level: str = Field("INFO", env="LOG_LEVEL")
     safe_exec_mem_mb: int = Field(200, env="SAFE_EXEC_MEM_MB")
+    data_dir: str = Field("data", env="DATA_DIR")
+    db_file: str = Field("datasets.db", env="DB_FILE")
 
     class Config:
         case_sensitive = False

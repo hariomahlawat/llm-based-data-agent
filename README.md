@@ -101,9 +101,29 @@ docker compose up --build
 ```
 
 Backend will be available at [http://localhost:8000](http://localhost:8000)
-and the React UI at [http://localhost:3000](http://localhost:3000)
+and the React UI at [http://localhost:3000](http://localhost:3000). The optional
+`proxy` service exposes both on [http://localhost:8080](http://localhost:8080).
 
-### 6.3 Local venv (no Docker)
+### 6.3 Production build and compose
+
+1. Build the React frontend which will generate static files served by Nginx:
+
+   ```bash
+   cd frontend
+   npm install
+   npm run build
+   ```
+
+2. Start all services including the reverse proxy:
+
+   ```bash
+   docker compose up --build
+   ```
+
+   Uploaded datasets are persisted under the `data_files` volume and can be
+   configured through environment variables defined in `docker-compose.yml`.
+
+### 6.4 Local venv (no Docker)
 
 ```bash
 python -m venv .venv
@@ -113,7 +133,7 @@ uvicorn app.api:app --reload
 cd frontend && npm install && npm run dev
 ```
 
-### 6.4 Makefile Shortcuts
+### 6.5 Makefile Shortcuts
 
 ```bash
 # run local app with venv
@@ -128,7 +148,7 @@ make docker
 ```
 
 
-### 6.5 FastAPI server
+### 6.6 FastAPI server
 
 ```bash
 uvicorn app.api:app --reload
@@ -136,7 +156,7 @@ uvicorn app.api:app --reload
 
 This exposes endpoints like `/upload`, `/summary/{id}`, `/chart/{id}`, `/nl2code/{id}` and `/run_code/{id}`.
 
-### 6.6 Running tests
+### 6.7 Running tests
 
 Install the runtime and dev requirements first:
 
