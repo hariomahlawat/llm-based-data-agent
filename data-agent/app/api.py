@@ -30,6 +30,7 @@ from .services.postprocess import extract_outputs, figure_to_png
 from .services.safe_exec import run as safe_run
 from .core.storage import add_dataset, get_dataset_path, init_db
 from .core.error_utils import logger
+from .services.report import create_pdf_report, create_pptx_report
 import traceback
 
 
@@ -131,6 +132,31 @@ def insights(ds_id: str):
             return JSONResponse(status_code=404, content={"error": "dataset not found"})
         DATASETS[ds_id] = df
     return InsightsResponse(**basic_insights(df))
+
+
+@app.get("/report/{ds_id}")
+def report(ds_id: str, format: str = "pdf"):
+    df = DATASETS.get(ds_id)
+    if df is None:
+        try:
+            df = load_any(get_dataset_path(ds_id))
+        except Exception:
+            return JSONResponse(status_code=404, content={"error": "dataset not found"})
+        DATASETS[ds_id] = df
+
+    if format == "pdf":
+        buf = create_pdf_report(df)
+        headers = {"Content-Disposition": "attachment; filename=report.pdf"}
+        return StreamingResponse(buf, media_type="application/pdf", headers=headers)
+    if format == "pptx":
+        buf = create_pptx_report(df)
+        headers = {"Content-Disposition": "attachment; filename=report.pptx"}
+        return StreamingResponse(
+            buf,
+            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            headers=headers,
+        )
+    return JSONResponse(status_code=400, content={"error": "unknown format"})
 
 
 @app.post("/chart/{ds_id}")
