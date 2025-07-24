@@ -261,10 +261,13 @@ Happy building.
 
 ---
 
-## Offline Deployment on Windows
 
-For step-by-step instructions to run the stack without internet access,
-see [docs/OFFLINE_WINDOWS.md](docs/OFFLINE_WINDOWS.md).
+## Offline Deployment
+
+Instructions for air-gapped setups are provided for both Windows and Linux/macOS.
+
+- [docs/OFFLINE_WINDOWS.md](docs/OFFLINE_WINDOWS.md) – Windows specific steps.
+- [docs/OFFLINE_DOCKER.md](docs/OFFLINE_DOCKER.md) – generic Docker workflow.
 
 Additional UI tips are available in [docs/UI_BEST_PRACTICES.md](docs/UI_BEST_PRACTICES.md).
 
