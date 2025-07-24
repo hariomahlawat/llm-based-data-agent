@@ -4,3 +4,6 @@ numpy>=1.26
 openpyxl>=3.1     # lets pandas read .xlsx
 reportlab>=4.0
 python-pptx>=0.6
+fastapi>=0.110
+uvicorn[standard]>=0.29
+requests>=2.32
