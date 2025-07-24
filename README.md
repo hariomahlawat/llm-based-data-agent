@@ -98,7 +98,7 @@ Teams often need quick exploratory analysis without sending sensitive data to th
 
 ### 6.2 One line Docker run
 
-```bash
+```powershell
 docker compose up --build
 ```
 
@@ -110,7 +110,7 @@ and the React UI at [http://localhost:3000](http://localhost:3000). The optional
 
 1. Build the React frontend which will generate static files served by Nginx:
 
-   ```bash
+   ```powershell
    cd frontend
    npm install
    npm run build
@@ -118,7 +118,7 @@ and the React UI at [http://localhost:3000](http://localhost:3000). The optional
 
 2. Start all services including the reverse proxy:
 
-   ```bash
+   ```powershell
    docker compose up --build
    ```
 
@@ -127,9 +127,9 @@ and the React UI at [http://localhost:3000](http://localhost:3000). The optional
 
 ### 6.4 Local venv (no Docker)
 
-```bash
+```powershell
 python -m venv .venv
-source .venv/Scripts/activate  # Windows: .venv\Scripts\Activate.ps1
+\.\.venv\Scripts\Activate.ps1
 pip install -r data-agent/requirements.txt
 uvicorn app.api:app --reload
 cd frontend && npm install && npm run dev
@@ -137,7 +137,8 @@ cd frontend && npm install && npm run dev
 
 ### 6.5 Makefile Shortcuts
 
-```bash
+# run local app with venv
+```powershell
 # run local app with venv
 make dev
 
@@ -152,7 +153,7 @@ make docker
 
 ### 6.6 FastAPI server
 
-```bash
+```powershell
 uvicorn app.api:app --reload
 ```
 
@@ -162,14 +163,15 @@ This exposes endpoints like `/upload`, `/summary/{id}`, `/chart/{id}`, `/nl2code
 
 Install the runtime and dev requirements first:
 
-```bash
+```powershell
 pip install -r data-agent/requirements.txt -r requirements-dev.txt
 ```
 
 Then execute the test suite with the repository root on the `PYTHONPATH`:
 
-```bash
-PYTHONPATH=. pytest -q
+```powershell
+$env:PYTHONPATH = '.'
+pytest -q
 ```
 
 ---

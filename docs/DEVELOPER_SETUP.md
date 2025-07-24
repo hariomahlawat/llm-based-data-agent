@@ -11,21 +11,16 @@ It assumes minimal knowledge of Python and Docker.
 
 ## 2. Clone the repository
 
-```bash
+```powershell
 git clone https://github.com/your-org/data-agent.git
 cd data-agent
 ```
 
 ## 3. Create a virtual environment
 
-```bash
-python3 -m venv .venv
-# Linux/macOS
-source .venv/bin/activate
-# Windows (cmd)
-.\.venv\Scripts\activate.bat
-# Windows (PowerShell)
-.\.venv\Scripts\Activate.ps1
+```powershell
+python -m venv .venv
+\.\.venv\Scripts\Activate.ps1
 pip install -r data-agent/requirements.txt -r requirements-dev.txt
 ```
 
@@ -37,7 +32,7 @@ installs all runtime and development dependencies.
 
 While the virtual environment is active, start the FastAPI server:
 
-```bash
+```powershell
 uvicorn app.api:app --reload
 ```
 
@@ -49,7 +44,7 @@ files under `app/`.
 
 The React UI lives in the `frontend/` folder.
 
-```bash
+```powershell
 cd frontend
 npm install
 npm run dev
@@ -62,8 +57,9 @@ The development server listens on port `5173` by default. Visit
 
 From the repository root run:
 
-```bash
-PYTHONPATH=. pytest -q
+```powershell
+$env:PYTHONPATH = '.'
+pytest -q
 ```
 
 You may need to activate the virtual environment first.
