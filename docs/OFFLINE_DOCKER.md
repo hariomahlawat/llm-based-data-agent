@@ -2,21 +2,21 @@
 
 This document explains how to run the Docker stack on a machine
 without internet access. The process is similar to the Windows steps but
-uses standard Linux commands.
+uses PowerShell commands which also work on Linux/macOS via PowerShell Core.
 
 ## 1. Prepare on a machine with internet
 
 1. Install Docker on an online machine.
 2. Clone this repository and switch into it.
 3. Pull all required container images:
-   ```bash
+   ```powershell
    docker pull python:3.11-slim
    docker pull node:20-alpine
    docker pull nginx:alpine
    docker pull ollama/ollama:latest
    ```
 4. Save the images to tar files for transfer:
-   ```bash
+   ```powershell
    docker save -o python.tar python:3.11-slim
    docker save -o node.tar node:20-alpine
    docker save -o nginx.tar nginx:alpine
@@ -25,14 +25,14 @@ uses standard Linux commands.
 5. Download Linux wheels for Python 3.11 into `data-agent/wheels`.
    The `--platform` flag ensures the packages match the Docker image
    (which is Linux based):
-   ```bash
-   mkdir -p data-agent/wheels
+   ```powershell
+   mkdir data-agent/wheels
    pip download --platform manylinux2014_x86_64 --python-version 3.11 \
        --only-binary=:all: -r data-agent/requirements.txt -d data-agent/wheels
    ```
 6. (Optional) cache npm packages for the frontend:
-   ```bash
-   mkdir -p frontend/npm_cache
+   ```powershell
+   mkdir frontend/npm_cache
    npm install --ignore-scripts --cache ./frontend/npm_cache
    ```
 7. Copy the repository along with all `*.tar` files to the offline
@@ -42,7 +42,7 @@ uses standard Linux commands.
 
 1. Install Docker Engine on the target machine.
 2. Load the saved images:
-   ```bash
+   ```powershell
    docker load -i python.tar
    docker load -i node.tar
    docker load -i nginx.tar
@@ -53,19 +53,19 @@ uses standard Linux commands.
 ## 3. Build and run
 
 1. Build the API container (installs packages from the `wheels` folder):
-   ```bash
+   ```powershell
    cd data-agent
    docker build -t data-agent-api .
    cd ..
    ```
 2. Build the frontend container:
-   ```bash
+   ```powershell
    cd frontend
    docker build -t data-agent-frontend .
    cd ..
    ```
 3. Start the full stack:
-   ```bash
+   ```powershell
    docker compose up
    ```
    The API listens on port `8000` and the UI on `3000`. You can also use
