@@ -20,7 +20,12 @@ cd data-agent
 
 ```bash
 python3 -m venv .venv
+# Linux/macOS
 source .venv/bin/activate
+# Windows (cmd)
+.\.venv\Scripts\activate.bat
+# Windows (PowerShell)
+.\.venv\Scripts\Activate.ps1
 pip install -r data-agent/requirements.txt -r requirements-dev.txt
 ```
 
@@ -71,6 +76,11 @@ A few helper targets are defined in the `Makefile`:
 - `make lint` – run code style checks using pre-commit.
 - `make fmt` – auto-format the code base.
 - `make docker` – build and run the Docker compose stack.
+
+On Windows you may need to install `make` separately (e.g. via
+[Chocolatey](https://chocolatey.org/) or the
+[GnuWin](http://gnuwin32.sourceforge.net/packages/make.htm) package) or
+run the commands inside the file manually.
 
 ## 8. Common issues
 
