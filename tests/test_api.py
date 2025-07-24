@@ -46,3 +46,16 @@ def test_env_config(monkeypatch):
     import app.core.config as cfg
     reload(cfg)
     assert cfg.settings.log_level == "DEBUG"
+
+
+def test_report_endpoints(monkeypatch, tmp_path):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    csv = b"a,b\n1,2\n3,4\n"
+    resp = client.post("/upload", files={"file": ("r.csv", csv, "text/csv")})
+    ds_id = resp.json()["dataset_id"]
+    resp = client.get(f"/report/{ds_id}?format=pdf")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
+    resp = client.get(f"/report/{ds_id}?format=pptx")
+    assert resp.status_code == 200
+    assert "presentation" in resp.headers["content-type"]
