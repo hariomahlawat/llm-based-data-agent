@@ -12,6 +12,7 @@ import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import FileUpload from './FileUpload';
 import DatasetSummary from './DatasetSummary';
+import InsightCards from './InsightCards';
 import ChartBuilder from './ChartBuilder';
 import HistoryPanel from './HistoryPanel';
 
@@ -69,6 +70,7 @@ export default function App() {
         {datasetId && (
           <>
             <DatasetSummary datasetId={datasetId} />
+            <InsightCards datasetId={datasetId} />
             <ChartBuilder
               datasetId={datasetId}
               columns={columns}

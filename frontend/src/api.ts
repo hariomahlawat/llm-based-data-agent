@@ -52,6 +52,11 @@ export interface RunResult {
   texts: string[];
 }
 
+export interface Insights {
+  missing_pct: Record<string, number>;
+  outlier_counts: Record<string, number>;
+}
+
 export async function runCode(
   dsId: string,
   code: string
@@ -63,4 +68,21 @@ export async function runCode(
   });
   if (!res.ok) throw new Error('Run failed');
   return res.json();
+}
+
+export async function fetchInsights(dsId: string): Promise<Insights> {
+  const res = await fetch(`${API_BASE}/insights/${dsId}`);
+  if (!res.ok) throw new Error('Insights failed');
+  return res.json();
+}
+
+export async function explainChart(dsId: string, spec: any): Promise<string> {
+  const res = await fetch(`${API_BASE}/explain_chart/${dsId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ spec }),
+  });
+  if (!res.ok) throw new Error('Explain failed');
+  const data = await res.json();
+  return data.summary;
 }

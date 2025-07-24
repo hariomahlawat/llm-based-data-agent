@@ -12,7 +12,7 @@ from fastapi import FastAPI, File, UploadFile, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from .core.analysis import basic_summary
+from .core.analysis import basic_summary, basic_insights
 from .core.charts import (
     bar_plot,
     box_plot,
@@ -69,6 +69,11 @@ class RunCodeResponse(BaseModel):
     images: list[str]
     texts: list[str]
 
+
+class InsightsResponse(BaseModel):
+    missing_pct: dict[str, float]
+    outlier_counts: dict[str, int]
+
 app = FastAPI(title="Data Agent API")
 
 DATASETS: Dict[str, pd.DataFrame] = {}
@@ -114,6 +119,18 @@ def summary(ds_id: str):
             return JSONResponse(status_code=404, content={"error": "dataset not found"})
         DATASETS[ds_id] = df
     return SummaryResponse(**basic_summary(df))
+
+
+@app.get("/insights/{ds_id}", response_model=InsightsResponse)
+def insights(ds_id: str):
+    df = DATASETS.get(ds_id)
+    if df is None:
+        try:
+            df = load_any(get_dataset_path(ds_id))
+        except Exception:
+            return JSONResponse(status_code=404, content={"error": "dataset not found"})
+        DATASETS[ds_id] = df
+    return InsightsResponse(**basic_insights(df))
 
 
 @app.post("/chart/{ds_id}")
@@ -181,3 +198,21 @@ async def run_code(ds_id: str, payload: RunCodeRequest) -> RunCodeResponse:
     tables = [df_out.to_csv(index=False) for df_out in dfs]
     images = [base64.b64encode(p.getvalue()).decode() for p in pngs]
     return RunCodeResponse(stdout=stdout, tables=tables, images=images, texts=texts)
+
+
+class ExplainChartRequest(BaseModel):
+    spec: dict[str, Any]
+
+
+@app.post("/explain_chart/{ds_id}")
+async def explain_chart(ds_id: str, payload: ExplainChartRequest):
+    df = DATASETS.get(ds_id)
+    if df is None:
+        try:
+            df = load_any(get_dataset_path(ds_id))
+        except Exception:
+            return JSONResponse(status_code=404, content={"error": "dataset not found"})
+        DATASETS[ds_id] = df
+    question = f"Explain this chart: spec={payload.spec}"
+    _, summary_code = ask_llm(question, df)
+    return {"summary": summary_code.strip()}

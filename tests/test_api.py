@@ -28,6 +28,18 @@ def test_run_code_route(monkeypatch, tmp_path):
     assert "4" in out["stdout"]
 
 
+def test_insights_route(monkeypatch, tmp_path):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    csv = b"a,b\n1,2\n3,100\n4,\n"
+    resp = client.post("/upload", files={"file": ("i.csv", csv, "text/csv")})
+    ds_id = resp.json()["dataset_id"]
+    resp = client.get(f"/insights/{ds_id}")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "missing_pct" in data
+    assert "outlier_counts" in data
+
+
 def test_env_config(monkeypatch):
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
     from importlib import reload
