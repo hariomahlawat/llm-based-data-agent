@@ -120,8 +120,8 @@ and the React UI at [http://localhost:3000](http://localhost:3000). The optional
    docker compose up --build
    ```
 
-   Uploaded datasets are persisted under the `data_files` volume and can be
-   configured through environment variables defined in `docker-compose.yml`.
+   Uploaded datasets are persisted under the `data_files` volume. Runtime
+   configuration is read from a `.env` file referenced by `docker-compose.yml`.
 
 ### 6.4 Local venv (no Docker)
 

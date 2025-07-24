@@ -14,7 +14,7 @@ import requests  # type: ignore
 # ---------------------------------------------------------------------
 # If running inside Docker and Ollama runs on host:
 # OLLAMA_URL = "http://host.docker.internal:11434/api"
-OLLAMA_URL = "http://localhost:11434/api"
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api")
 
 PREFERRED_MODELS: List[str] = [
     "mistral:7b-instruct",

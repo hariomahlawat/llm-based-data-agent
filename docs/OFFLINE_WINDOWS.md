@@ -75,9 +75,11 @@ that even first‑time Docker users can follow along.
    ```powershell
    docker compose up
    ```
-2. The API will listen on port `8000` and the React UI on `3000`. The optional
+2. Copy `.env.example` to `.env` if you need to tweak ports or paths. The
+   compose file reads all configuration from this file.
+3. The API will listen on port `8000` and the React UI on `3000`. The optional
    `proxy` service exposes both on `http://localhost:8080`.
-3. To stop everything press `Ctrl+C` and then run `docker compose down`.
+4. To stop everything press `Ctrl+C` and then run `docker compose down`.
 
 ## 5. Common Hurdles
 
