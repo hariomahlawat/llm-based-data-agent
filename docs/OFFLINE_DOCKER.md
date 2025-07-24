@@ -22,10 +22,13 @@ uses standard Linux commands.
    docker save -o nginx.tar nginx:alpine
    docker save -o ollama.tar ollama/ollama:latest
    ```
-5. Download Python packages to `data-agent/wheels`:
+5. Download Linux wheels for Python 3.11 into `data-agent/wheels`.
+   The `--platform` flag ensures the packages match the Docker image
+   (which is Linux based):
    ```bash
    mkdir -p data-agent/wheels
-   pip download -r data-agent/requirements.txt -d data-agent/wheels
+   pip download --platform manylinux2014_x86_64 --python-version 3.11 \
+       --only-binary=:all: -r data-agent/requirements.txt -d data-agent/wheels
    ```
 6. (Optional) cache npm packages for the frontend:
    ```bash

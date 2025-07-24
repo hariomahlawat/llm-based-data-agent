@@ -22,11 +22,13 @@ that even first‑time Docker users can follow along.
    docker save -o nginx.tar nginx:alpine
    docker save -o ollama.tar ollama/ollama:latest
    ```
-5. Create the directory `wheels` inside `data-agent/` and download Python
-   dependencies into it:
+5. Create the directory `wheels` inside `data-agent/` and download Linux
+   wheels for Python 3.11. Use the `--platform` option so that the packages
+   work inside the Linux based Docker container:
    ```powershell
    mkdir data-agent\wheels
-   pip download -r data-agent\requirements.txt -d data-agent\wheels
+   pip download --platform manylinux2014_x86_64 --python-version 3.11 \
+       --only-binary=:all: -r data-agent\requirements.txt -d data-agent\wheels
    ```
 6. (Optional) Cache npm packages for the frontend build:
    ```powershell
