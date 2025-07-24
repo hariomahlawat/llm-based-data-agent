@@ -33,6 +33,8 @@ Teams often need quick exploratory analysis without sending sensitive data to th
 - Chart theming presets and dark/light toggle.
 - Session history of prompts, code and outputs.
 - One click export of a report (PDF or PPTX) with charts and key stats.
+- Insight cards after each upload showing missing percentages and outlier counts.
+- "Explain this chart" button sends chart spec to the LLM for a narrative summary.
 
 ### 2.4 Optional Extras (Phase 4)
 
@@ -263,4 +265,6 @@ Happy building.
 
 For step-by-step instructions to run the stack without internet access,
 see [docs/OFFLINE_WINDOWS.md](docs/OFFLINE_WINDOWS.md).
+
+Additional UI tips are available in [docs/UI_BEST_PRACTICES.md](docs/UI_BEST_PRACTICES.md).
 

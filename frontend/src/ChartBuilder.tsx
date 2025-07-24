@@ -7,7 +7,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { fetchChart } from './api';
+import { fetchChart, explainChart } from './api';
 
 const CHART_TYPES = [
   'line',
@@ -42,6 +42,7 @@ export default function ChartBuilder({ datasetId, columns, onChart }: Props) {
   const [presets, setPresets] = useState<ChartPreset[]>(
     JSON.parse(localStorage.getItem(PRESET_KEY) || '[]')
   );
+  const [explanation, setExplanation] = useState('');
 
   const buildSpec = () => {
     const params: any = {};
@@ -55,6 +56,12 @@ export default function ChartBuilder({ datasetId, columns, onChart }: Props) {
     const spec = buildSpec();
     const url = await fetchChart(datasetId, spec);
     onChart(url);
+    try {
+      const text = await explainChart(datasetId, spec);
+      setExplanation(text);
+    } catch {
+      setExplanation('');
+    }
   };
 
   const handleSave = () => {
@@ -164,6 +171,11 @@ export default function ChartBuilder({ datasetId, columns, onChart }: Props) {
           Save Preset
         </Button>
       </Box>
+      {explanation && (
+        <Typography variant="body2" sx={{ mt: 1 }}>
+          {explanation}
+        </Typography>
+      )}
     </Box>
   );
 }

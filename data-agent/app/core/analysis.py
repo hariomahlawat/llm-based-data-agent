@@ -63,3 +63,13 @@ def detect_outliers(
     lower = q1 - 1.5 * iqr
     upper = q3 + 1.5 * iqr
     return (series < lower) | (series > upper)
+
+
+def basic_insights(df: pd.DataFrame) -> dict:
+    """Return missing value percentage and outlier counts per column."""
+    missing_pct = (df.isna().mean() * 100).round(2).to_dict()
+    outlier_counts: dict[str, int] = {}
+    for col in df.select_dtypes(include=["number"]).columns:
+        mask = detect_outliers(df[col].dropna())
+        outlier_counts[col] = int(mask.sum())
+    return {"missing_pct": missing_pct, "outlier_counts": outlier_counts}
