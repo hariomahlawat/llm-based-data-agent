@@ -1,6 +1,6 @@
 import pytest
 
-from app.core.safe_exec import _analyze, run
+from app.services.safe_exec import _analyze, run
 
 
 def test_analyze_disallows_import():
